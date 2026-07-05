@@ -75,6 +75,9 @@ class TransformRequest(BaseModel):
     session_id: str
     text: str
     policy_id: str | None = None
+    purpose: str | None = None
+    direction: str | None = None
+    environment: str | None = None
 
 
 class TransformResponse(BaseModel):

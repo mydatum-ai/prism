@@ -4,6 +4,7 @@ from prism_compiler.schemas import EntityDetection
 from prism_policy_runtime import (
     DEFAULT_POLICY,
     Policy,
+    PolicyDecisionContext,
     PublishedPolicyProvider,
     clear_policy_cache,
     decide,
@@ -176,6 +177,150 @@ def test_phase3_policy_decides_matching_action() -> None:
     assert decision.action == "mask"
     assert decision.policy_id == "test"
     assert decision.policy_version == "2"
+
+
+def test_p16_conflict_resolution_deny_wins() -> None:
+    policy = Policy.model_validate(
+        {
+            "domain": "conflict",
+            "rules": [
+                {
+                    "rule_id": "high_priority_tokenize",
+                    "entity_type": "email",
+                    "action": "tokenize",
+                    "priority": 100,
+                    "token_prefix": "EMAIL",
+                },
+                {
+                    "rule_id": "deny_email",
+                    "entity_type": "email",
+                    "action": "deny",
+                    "priority": 1,
+                },
+            ],
+        }
+    )
+
+    decision = decide(
+        policy,
+        EntityDetection(text="john@email.com", entity_type="email", start=0, end=14),
+    )
+
+    assert decision.action == "deny"
+    assert decision.rule_id == "deny_email"
+    assert decision.reason == "conflict_resolved"
+
+
+def test_p16_conflict_resolution_uses_priority_then_specificity_then_order() -> None:
+    detection = EntityDetection(
+        text="Maria Santos",
+        entity_type="person",
+        start=0,
+        end=12,
+        metadata={"role": "reporter"},
+    )
+    policy = Policy.model_validate(
+        {
+            "domain": "conflict",
+            "rules": [
+                {
+                    "rule_id": "first_equal_priority",
+                    "entity_type": "person",
+                    "action": "tokenize",
+                    "priority": 10,
+                    "token_prefix": "FIRST",
+                },
+                {
+                    "rule_id": "role_specific",
+                    "entity_type": "person",
+                    "role": "reporter",
+                    "action": "tokenize",
+                    "priority": 10,
+                    "token_prefix": "REPORTER",
+                },
+                {
+                    "rule_id": "highest_priority",
+                    "entity_type": "person",
+                    "role": "reporter",
+                    "action": "tokenize",
+                    "priority": 20,
+                    "token_prefix": "HIGH",
+                },
+            ],
+        }
+    )
+
+    decision = decide(policy, detection)
+
+    assert decision.rule_id == "highest_priority"
+    assert decision.token_prefix == "HIGH"
+
+    lower_priority_policy = policy.model_copy(update={"rules": policy.rules[:2]})
+    lower_priority_decision = decide(lower_priority_policy, detection)
+
+    assert lower_priority_decision.rule_id == "role_specific"
+    assert lower_priority_decision.token_prefix == "REPORTER"
+
+
+def test_p16_rule_matching_uses_context_and_confidence_threshold() -> None:
+    policy = Policy.model_validate(
+        {
+            "domain": "context",
+            "rules": [
+                {
+                    "rule_id": "analytics_app_rule",
+                    "entity_type": "email",
+                    "action": "redact",
+                    "app_id": "analytics",
+                    "purpose": "reporting",
+                    "direction": "outbound",
+                    "environment": "prod",
+                    "min_confidence": 0.9,
+                },
+                {
+                    "rule_id": "fallback_email",
+                    "entity_type": "email",
+                    "action": "mask",
+                },
+            ],
+        }
+    )
+    detection = EntityDetection(
+        text="john@email.com",
+        entity_type="email",
+        start=0,
+        end=14,
+        confidence=0.95,
+    )
+
+    decision = decide(
+        policy,
+        detection,
+        PolicyDecisionContext(
+            app_id="analytics",
+            purpose="reporting",
+            direction="outbound",
+            environment="prod",
+        ),
+    )
+
+    assert decision.rule_id == "analytics_app_rule"
+    assert decision.action == "redact"
+
+    low_confidence = detection.model_copy(update={"confidence": 0.5})
+    fallback = decide(
+        policy,
+        low_confidence,
+        PolicyDecisionContext(
+            app_id="analytics",
+            purpose="reporting",
+            direction="outbound",
+            environment="prod",
+        ),
+    )
+
+    assert fallback.rule_id == "fallback_email"
+    assert fallback.action == "mask"
 
 
 def test_phase_p15_default_policy_provider_preserves_current_policy() -> None:

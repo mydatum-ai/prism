@@ -12,7 +12,13 @@ from prism_compiler.schemas import (
     TransformResponse,
 )
 from prism_detectors import EmailDetector, InvoiceDetector, PhoneDetector, SimpleNameDetector
-from prism_policy_runtime import DEFAULT_POLICY, Policy, PolicyDecision, decide
+from prism_policy_runtime import (
+    DEFAULT_POLICY,
+    Policy,
+    PolicyDecision,
+    PolicyDecisionContext,
+    decide,
+)
 from prism_vault_core import GLOBAL_VAULT, InMemoryVault, VaultKey
 
 TOKEN_PREFIXES = {
@@ -61,7 +67,16 @@ def transform(
         unchanged = request.text[cursor : detection.start]
         transformed_parts.append(unchanged)
         transformed_cursor += len(unchanged)
-        decision = decide(policy, detection)
+        decision = decide(
+            policy,
+            detection,
+            PolicyDecisionContext(
+                app_id=request.app_id,
+                purpose=request.purpose,
+                direction=request.direction,
+                environment=request.environment,
+            ),
+        )
         counters[detection.entity_type] += 1
         replacement = _replacement_for(detection, counters[detection.entity_type], decision)
         transformed_parts.append(replacement)

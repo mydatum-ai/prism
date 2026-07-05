@@ -93,3 +93,40 @@ def test_p16_unmatched_entities_keep_default_tokenize_decision() -> None:
 
     assert response.transformed_text == "EMAIL_1"
     assert response.decisions[0].reason == "default_tokenize"
+
+
+def test_p16_transform_uses_request_context_for_policy_conditions() -> None:
+    policy = Policy.model_validate(
+        {
+            "domain": "context",
+            "rules": [
+                {
+                    "rule_id": "prod_outbound_email",
+                    "entity_type": "email",
+                    "action": "redact",
+                    "app_id": "pulse",
+                    "purpose": "analytics",
+                    "direction": "outbound",
+                    "environment": "prod",
+                },
+                {"rule_id": "email_default", "entity_type": "email", "action": "tokenize"},
+            ],
+        }
+    )
+
+    response = transform(
+        TransformRequest(
+            tenant_id="tenant_a",
+            app_id="pulse",
+            session_id="session_1",
+            text="maria@example.com",
+            purpose="analytics",
+            direction="outbound",
+            environment="prod",
+        ),
+        vault=InMemoryVault(),
+        policy=policy,
+    )
+
+    assert response.transformed_text == "[REDACTED_EMAIL]"
+    assert response.decisions[0].rule_id == "prod_outbound_email"
