@@ -48,11 +48,10 @@ def test_mydatum_provider_supports_internal_server_endpoints(
 
     auth.mydatum_provider()
 
-    metadata = registered["server_metadata"]
-    assert isinstance(metadata, dict)
     assert registered["authorize_url"] == "http://localhost:8000/o/authorize"
     assert registered["access_token_url"] == "http://host.docker.internal:8000/o/token"
-    assert metadata["jwks_uri"] == "http://host.docker.internal:8000/.well-known/jwks.json"
+    assert registered["userinfo_endpoint"] == "http://host.docker.internal:8000/o/userinfo"
+    assert registered["jwks_uri"] == "http://host.docker.internal:8000/.well-known/jwks.json"
     assert registered["client_id"] == "client"
 
 

@@ -1,9 +1,12 @@
+import logging
 import os
 import secrets
 from dataclasses import dataclass
 from typing import Any, cast
 
+import httpx
 from authlib.integrations.starlette_client import OAuth  # type: ignore[import-untyped]
+from authlib.jose import JsonWebKey, jwt  # type: ignore[import-untyped]
 from fastapi import Header, HTTPException, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
 
@@ -22,6 +25,7 @@ class Principal:
     auth_method: str = "api_key"
 
 
+logger = logging.getLogger(__name__)
 oauth = OAuth()
 
 
@@ -59,15 +63,33 @@ def mydatum_provider() -> Any:
         client_secret=setting("MYDATUM_CLIENT_SECRET"),
         authorize_url=f"{issuer}/o/authorize",
         access_token_url=f"{server_base_url}/o/token",
-        server_metadata={
-            "issuer": issuer,
-            "authorization_endpoint": f"{issuer}/o/authorize",
-            "token_endpoint": f"{server_base_url}/o/token",
-            "userinfo_endpoint": f"{server_base_url}/o/userinfo",
-            "jwks_uri": f"{server_base_url}/.well-known/jwks.json",
-        },
+        userinfo_endpoint=f"{server_base_url}/o/userinfo",
+        jwks_uri=f"{server_base_url}/.well-known/jwks.json",
         client_kwargs={"scope": setting("MYDATUM_SCOPES", "openid email")},
     )
+
+
+async def id_token_claims(token: dict[str, Any]) -> dict[str, Any]:
+    claims = token.get("userinfo") or token.get("id_token_claims")
+    if isinstance(claims, dict) and claims:
+        return cast(dict[str, Any], claims)
+
+    id_token = token.get("id_token")
+    if not isinstance(id_token, str) or not id_token:
+        return {}
+
+    issuer = setting("MYDATUM_ISSUER").rstrip("/")
+    server_base_url = (
+        setting("MYDATUM_INTERNAL_BASE_URL")
+        or setting("MYDATUM_DISCOVERY_URL").removesuffix("/.well-known/openid-configuration")
+        or issuer
+    ).rstrip("/")
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        response = await client.get(f"{server_base_url}/.well-known/jwks.json")
+        response.raise_for_status()
+    key_set = JsonWebKey.import_key_set(response.json())
+    decoded = jwt.decode(id_token, key_set)
+    return dict(decoded)
 
 
 def configured_api_keys() -> dict[str, str]:
@@ -151,7 +173,7 @@ async def callback(request: Request) -> RedirectResponse:
         )
     try:
         token = await mydatum_provider().authorize_access_token(request, code_verifier=verifier)
-        claims = cast(dict[str, Any], token.get("userinfo") or token.get("id_token_claims") or {})
+        claims = await id_token_claims(cast(dict[str, Any], token))
         userinfo = cast(dict[str, Any] | None, token.get("userinfo"))
         validate_claims(
             claims,
@@ -161,6 +183,11 @@ async def callback(request: Request) -> RedirectResponse:
         )
         validate_userinfo_subject(claims, userinfo)
     except Exception as error:
+        logger.warning(
+            "event=mydatum.callback_failed error_type=%s error=%s",
+            type(error).__name__,
+            str(error),
+        )
         raise HTTPException(status_code=400, detail="authentication_failed") from error
     request.session.clear()
     request.session["account"] = public_account(
