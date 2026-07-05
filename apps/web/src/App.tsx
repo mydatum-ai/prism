@@ -27,7 +27,7 @@ export function App() {
   const [status, setStatus] = useState("Ready");
 
   const sessionId = "web-session";
-  const appId = "web";
+  const appId = "pulse";
 
   useEffect(() => {
     void getAuthMe()
