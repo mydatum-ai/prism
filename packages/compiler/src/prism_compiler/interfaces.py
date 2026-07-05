@@ -21,7 +21,14 @@ class Provider(Protocol):
 class Vault(Protocol):
     """Stores private mappings between source values and Prism tokens."""
 
-    def put(self, key: str, value: str, ttl_seconds: int | None = None) -> None:
+    def put(
+        self,
+        key: str,
+        value: str,
+        entity_type: str = "unknown",
+        ttl_seconds: int | None = None,
+        metadata: dict[str, str] | None = None,
+    ) -> None:
         """Store a value under a key."""
 
     def get(self, key: str) -> str | None:

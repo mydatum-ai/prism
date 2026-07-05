@@ -20,8 +20,8 @@ class EntityDetection(BaseModel):
 
 class TokenMapping(BaseModel):
     token: str
-    original: str
     entity_type: str
+    metadata: dict[str, str] = Field(default_factory=dict)
 
 
 class AuditEvent(BaseModel):

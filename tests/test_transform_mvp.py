@@ -16,9 +16,10 @@ def test_phase1_transforms_prompt_and_stores_mappings() -> None:
     )
 
     assert response.transformed_text == "PERSON_1 emailed EMAIL_1 about INVOICE_1"
-    assert [(mapping.token, mapping.original) for mapping in response.mappings] == [
-        ("PERSON_1", "John Smith"),
-        ("EMAIL_1", "john@email.com"),
-        ("INVOICE_1", "INV-1001"),
+    assert [(mapping.token, mapping.entity_type) for mapping in response.mappings] == [
+        ("PERSON_1", "person"),
+        ("EMAIL_1", "email"),
+        ("INVOICE_1", "invoice"),
     ]
+    assert "John Smith" not in response.model_dump_json()
     assert response.audit_event.event_type == "transform"

@@ -45,21 +45,37 @@ def transform(request: TransformRequest, vault: InMemoryVault = GLOBAL_VAULT) ->
     detections = detect_entities(request.text)
     counters: Counter[str] = Counter()
     mappings: list[TokenMapping] = []
+    response_detections: list[EntityDetection] = []
     transformed_parts: list[str] = []
     cursor = 0
+    transformed_cursor = 0
 
     for detection in detections:
-        transformed_parts.append(request.text[cursor : detection.start])
+        unchanged = request.text[cursor : detection.start]
+        transformed_parts.append(unchanged)
+        transformed_cursor += len(unchanged)
         counters[detection.entity_type] += 1
         token = _token_for(detection.entity_type, counters[detection.entity_type])
         transformed_parts.append(token)
         cursor = detection.end
+        token_start = transformed_cursor
+        transformed_cursor += len(token)
 
         vault.put(
-            VaultKey(request.tenant_id, request.app_id, request.session_id, token), detection.text
+            VaultKey(request.tenant_id, request.app_id, request.session_id, token),
+            detection.text,
+            entity_type=detection.entity_type,
+            metadata={"request_id": request_id},
         )
-        mappings.append(
-            TokenMapping(token=token, original=detection.text, entity_type=detection.entity_type)
+        mappings.append(TokenMapping(token=token, entity_type=detection.entity_type))
+        response_detections.append(
+            EntityDetection(
+                text=token,
+                entity_type=detection.entity_type,
+                start=token_start,
+                end=transformed_cursor,
+                confidence=detection.confidence,
+            )
         )
 
     transformed_parts.append(request.text[cursor:])
@@ -74,7 +90,7 @@ def transform(request: TransformRequest, vault: InMemoryVault = GLOBAL_VAULT) ->
     return TransformResponse(
         request_id=request_id,
         transformed_text="".join(transformed_parts),
-        detections=detections,
+        detections=response_detections,
         mappings=mappings,
         audit_event=audit_event,
     )

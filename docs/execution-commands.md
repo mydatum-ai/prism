@@ -198,11 +198,12 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/v1/chat/mock -ContentT
 ## Redis Vault
 
 ```powershell
-docker compose up -d redis
+docker compose -f docker/docker-compose.yml up -d redis
 $env:PRISM_VAULT_BACKEND="redis"
 $env:PRISM_REDIS_URL="redis://127.0.0.1:6379/0"
 pytest tests/test_redis_vault.py -q
-docker compose down
+pytest tests/integration/test_redis_vault_integration.py -q
+docker compose -f docker/docker-compose.yml down
 ```
 
 ## Phase 2: Mapping Vault
@@ -223,9 +224,9 @@ Focused verification:
 pytest tests/test_vault_core.py -q
 pytest tests/test_vault_ttl.py -q
 pytest tests/test_vault_tenant_scope.py -q
-docker compose up -d redis
-pytest tests/integration/test_redis_vault.py -q
-docker compose down
+docker compose -f docker/docker-compose.yml up -d redis
+pytest tests/integration/test_redis_vault_integration.py -q
+docker compose -f docker/docker-compose.yml down
 ```
 
 Commit and push:

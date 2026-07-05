@@ -53,9 +53,31 @@ mypy .
 pytest -q
 ```
 
+### Phase 2: Mapping Vault
+
+Status: completed
+
+Implemented:
+
+- `VaultKey` scoped by tenant, app, session, and token.
+- `VaultRecord` with entity type, created timestamp, optional expiry, and metadata.
+- `InMemoryVault` with TTL expiry and fail-closed missing or expired mapping behavior.
+- `RedisVault` with JSON record serialization, TTL support, and metadata round-trip.
+- Rehydration behavior that leaves unresolved or expired tokens in place.
+- Sanitized transform responses so original values remain in the vault and are not exposed through mappings or response detections.
+
+Verified:
+
+```powershell
+ruff format --check .
+ruff check .
+mypy .
+pytest -q
+pytest tests/integration/test_redis_vault_integration.py -q
+```
+
 ## Pending
 
-- Phase 2: Mapping Vault
 - Phase 3: Policy Runtime
 - Phase 4: Gateway And Provider Adapter
 - Phase 5: Evaluation Core
