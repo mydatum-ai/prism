@@ -8,7 +8,7 @@ import httpx
 from authlib.integrations.starlette_client import OAuth  # type: ignore[import-untyped]
 from authlib.jose import JsonWebKey, jwt  # type: ignore[import-untyped]
 from fastapi import Header, HTTPException, Request, status
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 
 from prism_gateway.mydatum_security import (
     pkce_challenge,
@@ -207,6 +207,6 @@ def me(request: Request) -> dict[str, object]:
     return {"authenticated": True, "account": account}
 
 
-def logout(request: Request) -> JSONResponse:
+def logout(request: Request) -> Response:
     request.session.clear()
-    return JSONResponse({}, status_code=204)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

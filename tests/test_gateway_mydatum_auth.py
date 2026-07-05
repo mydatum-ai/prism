@@ -14,6 +14,13 @@ def test_auth_me_requires_session() -> None:
     assert response.json()["detail"] == "not_authenticated"
 
 
+def test_auth_logout_returns_no_content_without_body() -> None:
+    response = TestClient(app).post("/auth/logout")
+
+    assert response.status_code == 204
+    assert response.content == b""
+
+
 def test_auth_login_requires_mydatum_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
     for name in (
         "MYDATUM_ISSUER",
