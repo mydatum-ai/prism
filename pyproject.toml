@@ -42,6 +42,7 @@ where = [
     "packages/rehydration/src",
     "packages/sdk-python/src",
     "packages/transformers/src",
+    "packages/transaction-events/src",
     "packages/vault-core/src",
 ]
 
@@ -58,6 +59,7 @@ pythonpath = [
     "packages/rehydration/src",
     "packages/sdk-python/src",
     "packages/transformers/src",
+    "packages/transaction-events/src",
     "packages/vault-core/src",
 ]
 
@@ -83,5 +85,6 @@ mypy_path = [
     "packages/rehydration/src",
     "packages/sdk-python/src",
     "packages/transformers/src",
+    "packages/transaction-events/src",
     "packages/vault-core/src",
 ]
