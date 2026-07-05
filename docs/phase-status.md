@@ -124,8 +124,32 @@ mypy .
 pytest -q
 ```
 
+### Phase 5: Evaluation Core
+
+Status: completed
+
+Implemented:
+
+- JSONL dataset loader.
+- Evaluation runner for transform and rehydrate flows.
+- Leakage scanner based on detected raw identity values.
+- Rehydration accuracy validator.
+- Basic semantic comparator placeholder through transformation correctness and quality delta metrics.
+- JSON and Markdown report writers.
+- CLI command: `prism eval --dataset <path> --output <dir>`.
+- Public sample datasets: `synthetic_pii`, `pulse_sample`, and `customer_support`.
+
+Verified:
+
+```powershell
+prism eval --dataset datasets/synthetic_pii --output reports/synthetic_pii
+ruff format --check .
+ruff check .
+mypy .
+pytest -q
+```
+
 ## Pending
 
-- Phase 5: Evaluation Core
 - Phase 6: Enterprise Plugin Loading
 - Phases 7-12: Enterprise-driven compatibility work
