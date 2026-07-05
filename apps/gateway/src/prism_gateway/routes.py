@@ -132,4 +132,11 @@ def chat_completions_endpoint(
                 message=OpenAIChatChoiceMessage(role="assistant", content=rehydrated.text),
             )
         ],
+        audit_event=AuditEvent(
+            event_type="chat.completions",
+            tenant_id=tenant_id,
+            app_id=app_id,
+            session_id=session_id,
+            request_id=rehydrated.request_id,
+        ),
     )

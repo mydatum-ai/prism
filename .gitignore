@@ -217,3 +217,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Prism local state
+.prism/
+apps/web/node_modules/
+apps/web/dist/
+apps/web/*.tsbuildinfo

@@ -106,3 +106,4 @@ class OpenAIChatCompletionResponse(BaseModel):
     created: int
     model: str
     choices: list[OpenAIChatChoice]
+    audit_event: AuditEvent | None = None

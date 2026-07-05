@@ -1,0 +1,9 @@
+.git
+.prism
+.pytest_cache
+.ruff_cache
+.mypy_cache
+**/__pycache__
+apps/web/node_modules
+apps/web/dist
+apps/web/*.tsbuildinfo
