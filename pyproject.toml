@@ -1,0 +1,82 @@
+[project]
+name = "prism"
+version = "0.1.0"
+description = "Open-core Prism privacy transformation runtime."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "pydantic>=2.8.0",
+    "pyyaml>=6.0.0",
+    "redis>=5.0.0",
+    "uvicorn>=0.30.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "httpx>=0.27.0",
+    "mypy>=1.10.0",
+    "pytest>=8.2.0",
+    "ruff>=0.5.0",
+]
+
+[project.scripts]
+prism = "prism_cli.main:main"
+
+[build-system]
+requires = ["setuptools>=70.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = [
+    "apps/gateway/src",
+    "packages/cli/src",
+    "packages/compiler/src",
+    "packages/detectors/src",
+    "packages/evaluation/src",
+    "packages/policy-runtime/src",
+    "packages/rehydration/src",
+    "packages/sdk-python/src",
+    "packages/transformers/src",
+    "packages/vault-core/src",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [
+    "apps/gateway/src",
+    "packages/cli/src",
+    "packages/compiler/src",
+    "packages/detectors/src",
+    "packages/evaluation/src",
+    "packages/policy-runtime/src",
+    "packages/rehydration/src",
+    "packages/sdk-python/src",
+    "packages/transformers/src",
+    "packages/vault-core/src",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+explicit_package_bases = true
+mypy_path = [
+    "apps/gateway/src",
+    "packages/cli/src",
+    "packages/compiler/src",
+    "packages/detectors/src",
+    "packages/evaluation/src",
+    "packages/policy-runtime/src",
+    "packages/rehydration/src",
+    "packages/sdk-python/src",
+    "packages/transformers/src",
+    "packages/vault-core/src",
+]
+
