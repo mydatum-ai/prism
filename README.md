@@ -70,7 +70,7 @@ Prism can resolve runtime policies from a sibling `prism-enterprise` checkout by
 enterprise policy provider:
 
 ```powershell
-$env:PRISM_POLICY_PROVIDER="prism_enterprise_dashboard.policy_provider:PublishedPolicyProvider"
+$env:PRISM_POLICY_PROVIDER="prism_policy_runtime.providers:PublishedPolicyProvider"
 $env:PRISM_ENTERPRISE_POLICY_API_URL="http://127.0.0.1:8005"
 $env:PRISM_ENTERPRISE_POLICY_API_KEY="dev"
 $env:PRISM_ENTERPRISE_POLICY_TIMEOUT_SECONDS="2"
@@ -85,9 +85,12 @@ override:
 docker compose -f docker\docker-compose.yml -f docker\docker-compose.enterprise.yml --profile dev up --build gateway web
 ```
 
-The override builds from `C:\Users\john_\Desktop` and expects sibling folders named `prism` and
-`prism-enterprise`. If the enterprise provider is unavailable or returns no active policy for the
-tenant/app pair, Prism falls back to its local policy behavior.
+If the enterprise provider is unavailable or returns no active policy for the tenant/app pair,
+Prism falls back to its local policy behavior. The older provider import string
+`prism_enterprise_dashboard.policy_provider:PublishedPolicyProvider` is still accepted as a
+compatibility alias, but new deployments should use
+`prism_policy_runtime.providers:PublishedPolicyProvider` so the Prism gateway does not need the
+private Enterprise package installed.
 
 Policy runtime cache invalidation is available through the gateway:
 

@@ -1,8 +1,10 @@
+import httpx
 import pytest
 from prism_compiler.schemas import EntityDetection
 from prism_policy_runtime import (
     DEFAULT_POLICY,
     Policy,
+    PublishedPolicyProvider,
     clear_policy_cache,
     decide,
     load_policy,
@@ -189,6 +191,41 @@ def test_phase_p15_import_string_policy_provider_override() -> None:
 
     assert policy.domain == "pulse"
     assert policy.rules[0].token_prefix == "TEST"
+
+
+def test_phase_p18_legacy_enterprise_provider_import_uses_builtin_provider() -> None:
+    provider = load_policy_provider(
+        "prism_enterprise_dashboard.policy_provider:PublishedPolicyProvider"
+    )
+
+    assert isinstance(provider, PublishedPolicyProvider)
+
+
+def test_phase_p18_builtin_published_policy_provider_calls_enterprise_runtime() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers["X-Prism-Tenant"] == "tenant_dev"
+        assert request.headers["X-Prism-API-Key"] == "dev"
+        assert request.url.path == "/tenants/tenant_dev/policies/active/pulse/runtime"
+        return httpx.Response(
+            200,
+            json={
+                "domain": "pulse",
+                "version": "7",
+                "rules": [{"entity_type": "person", "action": "tokenize", "token_prefix": "LIVE"}],
+            },
+        )
+
+    provider = PublishedPolicyProvider(
+        base_url="http://enterprise.test",
+        api_key="dev",
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    policy = provider.resolve_policy("tenant_dev", "pulse")
+
+    assert policy is not None
+    assert policy.version == "7"
+    assert policy.rules[0].token_prefix == "LIVE"
 
 
 def test_phase_p15_invalid_policy_provider_path_fails_clearly() -> None:

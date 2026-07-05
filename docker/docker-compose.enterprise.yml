@@ -4,7 +4,7 @@ services:
       context: ../..
       dockerfile: prism/docker/gateway.enterprise.Dockerfile
     environment:
-      PRISM_POLICY_PROVIDER: prism_enterprise_dashboard.policy_provider:PublishedPolicyProvider
+      PRISM_POLICY_PROVIDER: prism_policy_runtime.providers:PublishedPolicyProvider
       PRISM_ENTERPRISE_POLICY_API_URL: ${PRISM_ENTERPRISE_POLICY_API_URL:-http://host.docker.internal:8005}
       PRISM_ENTERPRISE_POLICY_API_KEY: ${PRISM_ENTERPRISE_POLICY_API_KEY:-dev}
       PRISM_ENTERPRISE_POLICY_TIMEOUT_SECONDS: ${PRISM_ENTERPRISE_POLICY_TIMEOUT_SECONDS:-2}

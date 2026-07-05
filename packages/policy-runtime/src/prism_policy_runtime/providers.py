@@ -1,10 +1,18 @@
 import importlib
+import logging
 import os
 from dataclasses import dataclass
 from time import monotonic
 from typing import Literal, Protocol, cast
 
+import httpx
+
 from prism_policy_runtime.policy import DEFAULT_POLICY, Policy, load_policy
+
+logger = logging.getLogger(__name__)
+ENTERPRISE_PROVIDER_COMPAT_PATH = (
+    "prism" + "_enterprise_dashboard.policy_provider:PublishedPolicyProvider"
+)
 
 
 class PolicyProvider(Protocol):
@@ -18,6 +26,53 @@ class DefaultPolicyProvider:
         if policy_path:
             return load_policy(policy_path)
         return DEFAULT_POLICY
+
+
+class PublishedPolicyProvider:
+    def __init__(
+        self,
+        *,
+        base_url: str | None = None,
+        api_key: str | None = None,
+        timeout_seconds: float | None = None,
+        client: httpx.Client | None = None,
+    ) -> None:
+        configured_base_url = (
+            base_url if base_url is not None else os.getenv("PRISM_ENTERPRISE_POLICY_API_URL", "")
+        )
+        self.base_url = configured_base_url.rstrip("/")
+        self.api_key = (
+            api_key if api_key is not None else os.getenv("PRISM_ENTERPRISE_POLICY_API_KEY", "")
+        )
+        self.timeout_seconds = timeout_seconds or float(
+            os.getenv("PRISM_ENTERPRISE_POLICY_TIMEOUT_SECONDS", "2")
+        )
+        self.client = client
+
+    def resolve_policy(self, tenant_id: str, app_id: str) -> Policy | None:
+        if not self.base_url or not self.api_key:
+            return None
+        path = f"/tenants/{tenant_id}/policies/active/{app_id}/runtime"
+        headers = {"X-Prism-Tenant": tenant_id, "X-Prism-API-Key": self.api_key}
+        try:
+            if self.client is not None:
+                response = self.client.get(f"{self.base_url}{path}", headers=headers)
+            else:
+                with httpx.Client(timeout=self.timeout_seconds) as client:
+                    response = client.get(f"{self.base_url}{path}", headers=headers)
+            if response.status_code == 404:
+                return None
+            response.raise_for_status()
+            return Policy.model_validate(response.json())
+        except Exception as error:
+            logger.warning(
+                "event=published_policy_provider.resolve_failed "
+                "tenant_id=%s app_id=%s error_type=%s",
+                tenant_id,
+                app_id,
+                type(error).__name__,
+            )
+            return None
 
 
 @dataclass
@@ -73,6 +128,8 @@ def load_policy_provider(path: str | None = None) -> PolicyProvider:
     provider_path = (path or os.getenv("PRISM_POLICY_PROVIDER") or "default").strip()
     if not provider_path or provider_path == "default":
         return DefaultPolicyProvider()
+    if provider_path == ENTERPRISE_PROVIDER_COMPAT_PATH:
+        return PublishedPolicyProvider()
     module_name, separator, attribute = provider_path.partition(":")
     if not separator:
         module_name, separator, attribute = provider_path.rpartition(".")
