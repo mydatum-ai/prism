@@ -50,11 +50,25 @@ def list_policy_packages() -> list[PolicyPackage]:
     return sorted(_PACKAGE_INDEX.values(), key=lambda package: package.package_id)
 
 
+def list_policy_package_versions() -> dict[str, str]:
+    return {package.package_id: package.version for package in list_policy_packages()}
+
+
 def load_policy_package(package_id: str) -> PolicyPackage:
     try:
         return _PACKAGE_INDEX[package_id]
     except KeyError as error:
         raise UnknownPolicyPackageError(f"Unknown policy package: {package_id}") from error
+
+
+def latest_policy_package_version(package_id: str) -> str:
+    return load_policy_package(package_id).version
+
+
+def package_upgrade_available(package_id: str, installed_version: str | None) -> bool:
+    if not installed_version:
+        return False
+    return latest_policy_package_version(package_id) != installed_version
 
 
 def _rule(

@@ -4,8 +4,11 @@ from prism_policy_packs import (
     PolicyPackage,
     PolicyPackageExample,
     UnknownPolicyPackageError,
+    latest_policy_package_version,
+    list_policy_package_versions,
     list_policy_packages,
     load_policy_package,
+    package_upgrade_available,
 )
 from prism_policy_runtime import PolicyRule
 from prism_rehydration import rehydrate
@@ -62,9 +65,27 @@ def test_p17_policy_package_discovery_contract_is_stable() -> None:
     assert {package.package_id for package in list_policy_packages()} == REQUIRED_PACKAGE_IDS
 
 
+def test_p17_policy_package_version_discovery_is_stable() -> None:
+    versions = list_policy_package_versions()
+
+    assert set(versions) == REQUIRED_PACKAGE_IDS
+    assert versions == dict(sorted(versions.items()))
+    assert all(version == "1.0.0" for version in versions.values())
+
+
+def test_p17_policy_package_upgrade_detection_uses_latest_version() -> None:
+    assert latest_policy_package_version("financial.default") == "1.0.0"
+    assert package_upgrade_available("financial.default", "0.9.0") is True
+    assert package_upgrade_available("financial.default", "1.0.0") is False
+    assert package_upgrade_available("financial.default", None) is False
+
+
 def test_p17_unknown_policy_package_fails_clearly() -> None:
     with pytest.raises(UnknownPolicyPackageError, match="Unknown policy package"):
         load_policy_package("missing.package")
+
+    with pytest.raises(UnknownPolicyPackageError, match="Unknown policy package"):
+        latest_policy_package_version("missing.package")
 
 
 def test_p17_policy_packages_transform_and_rehydrate_with_allowed_roles() -> None:
