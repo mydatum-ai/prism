@@ -14,6 +14,7 @@ from prism_compiler.schemas import (
     RehydrateRequest,
     RehydrateResponse,
     TokenMapping,
+    TransformationDecision,
     TransformRequest,
     TransformResponse,
 )
@@ -34,4 +35,5 @@ __all__ = [
     "TokenMapping",
     "TransformRequest",
     "TransformResponse",
+    "TransformationDecision",
 ]

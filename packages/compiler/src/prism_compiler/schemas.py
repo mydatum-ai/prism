@@ -44,6 +44,19 @@ class TokenMapping(BaseModel):
     metadata: dict[str, str] = Field(default_factory=dict)
 
 
+class TransformationDecision(BaseModel):
+    entity_type: str
+    action: str
+    policy_id: str
+    policy_version: str
+    rule_id: str | None = None
+    reason: str
+    token: str | None = None
+    start: int = Field(ge=0)
+    end: int = Field(ge=0)
+    confidence: float = Field(ge=0.0, le=1.0, default=1.0)
+
+
 class AuditEvent(BaseModel):
     event_type: str
     tenant_id: str
@@ -69,6 +82,7 @@ class TransformResponse(BaseModel):
     transformed_text: str
     detections: list[EntityDetection] = Field(default_factory=list)
     mappings: list[TokenMapping] = Field(default_factory=list)
+    decisions: list[TransformationDecision] = Field(default_factory=list)
     audit_event: AuditEvent
 
 

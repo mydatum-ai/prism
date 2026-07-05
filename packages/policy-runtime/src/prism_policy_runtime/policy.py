@@ -5,10 +5,20 @@ import yaml
 from prism_compiler.schemas import EntityDetection
 from pydantic import BaseModel, Field
 
-PolicyAction = Literal["preserve", "tokenize", "mask", "generalize", "abstract", "block"]
+PolicyAction = Literal[
+    "preserve",
+    "tokenize",
+    "redact",
+    "generalize",
+    "mask",
+    "deny",
+    "abstract",
+    "block",
+]
 
 
 class PolicyRule(BaseModel):
+    rule_id: str | None = None
     entity_type: str
     action: PolicyAction
     role: str | None = None
@@ -32,6 +42,8 @@ class PolicyDecision(BaseModel):
     replacement: str | None = None
     policy_id: str
     policy_version: str
+    rule_id: str | None = None
+    reason: str
 
 
 DEFAULT_POLICY = Policy(
@@ -65,10 +77,13 @@ def decide(policy: Policy, detection: EntityDetection) -> PolicyDecision:
             replacement=rule.replacement,
             policy_id=policy.policy_id,
             policy_version=policy.version,
+            rule_id=rule.rule_id,
+            reason="rule_matched",
         )
     return PolicyDecision(
         action="tokenize",
         token_prefix=detection.entity_type.upper(),
         policy_id=policy.policy_id,
         policy_version=policy.version,
+        reason="default_tokenize",
     )

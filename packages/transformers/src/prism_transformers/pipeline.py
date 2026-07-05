@@ -7,6 +7,7 @@ from prism_compiler.schemas import (
     AuditEvent,
     EntityDetection,
     TokenMapping,
+    TransformationDecision,
     TransformRequest,
     TransformResponse,
 )
@@ -50,6 +51,7 @@ def transform(
     detections = detect_entities(request.text)
     counters: Counter[str] = Counter()
     mappings: list[TokenMapping] = []
+    decisions: list[TransformationDecision] = []
     response_detections: list[EntityDetection] = []
     transformed_parts: list[str] = []
     cursor = 0
@@ -68,13 +70,39 @@ def transform(
         transformed_cursor += len(replacement)
 
         if decision.action == "tokenize":
+            metadata = {
+                "request_id": request_id,
+                "policy_id": decision.policy_id,
+                "policy_version": decision.policy_version,
+                "decision_reason": decision.reason,
+            }
+            if decision.rule_id is not None:
+                metadata["rule_id"] = decision.rule_id
             vault.put(
                 VaultKey(request.tenant_id, request.app_id, request.session_id, replacement),
                 detection.text,
                 entity_type=detection.entity_type,
-                metadata={"request_id": request_id, "policy_id": decision.policy_id},
+                metadata=metadata,
             )
-            mappings.append(TokenMapping(token=replacement, entity_type=detection.entity_type))
+            mappings.append(
+                TokenMapping(
+                    token=replacement, entity_type=detection.entity_type, metadata=metadata
+                )
+            )
+        decisions.append(
+            TransformationDecision(
+                entity_type=detection.entity_type,
+                action=decision.action,
+                policy_id=decision.policy_id,
+                policy_version=decision.policy_version,
+                rule_id=decision.rule_id,
+                reason=decision.reason,
+                token=replacement if decision.action == "tokenize" else None,
+                start=token_start,
+                end=transformed_cursor,
+                confidence=detection.confidence,
+            )
+        )
         response_detections.append(
             EntityDetection(
                 text=replacement,
@@ -100,6 +128,7 @@ def transform(
         transformed_text="".join(transformed_parts),
         detections=response_detections,
         mappings=mappings,
+        decisions=decisions,
         audit_event=audit_event,
     )
 
@@ -120,10 +149,14 @@ def _replacement_for(detection: EntityDetection, index: int, decision: PolicyDec
         return f"{prefix}_{index}"
     if action == "mask":
         return decision.replacement or f"[MASKED_{detection.entity_type.upper()}]"
+    if action == "redact":
+        return decision.replacement or f"[REDACTED_{detection.entity_type.upper()}]"
     if action == "generalize":
         return decision.replacement or detection.entity_type
     if action == "abstract":
         return decision.replacement or f"[{detection.entity_type.upper()}]"
+    if action == "deny":
+        return decision.replacement or "[DENIED]"
     if action == "block":
         return decision.replacement or "[BLOCKED]"
     return _token_for(detection.entity_type, index)
