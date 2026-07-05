@@ -64,3 +64,27 @@ docker compose -f docker\docker-compose.yml --profile staging up --build
 docker compose -f docker\docker-compose.yml --profile prod up --build
 ```
 
+## Published Enterprise Policies
+
+Prism can resolve runtime policies from a sibling `prism-enterprise` checkout by loading the
+enterprise policy provider:
+
+```powershell
+$env:PRISM_POLICY_PROVIDER="prism_enterprise_dashboard.policy_provider:PublishedPolicyProvider"
+$env:PRISM_ENTERPRISE_POLICY_API_URL="http://127.0.0.1:8005"
+$env:PRISM_ENTERPRISE_POLICY_API_KEY="dev"
+$env:PRISM_ENTERPRISE_POLICY_TIMEOUT_SECONDS="2"
+uvicorn prism_gateway.main:app --reload --app-dir apps/gateway/src --host 127.0.0.1 --port 8004
+```
+
+When Prism runs in Docker and Prism Enterprise runs on the host, use the enterprise compose
+override:
+
+```powershell
+docker compose -f docker\docker-compose.yml -f docker\docker-compose.enterprise.yml --profile dev up --build gateway web
+```
+
+The override builds from `C:\Users\john_\Desktop` and expects sibling folders named `prism` and
+`prism-enterprise`. If the enterprise provider is unavailable or returns no active policy for the
+tenant/app pair, Prism falls back to its local policy behavior.
+
