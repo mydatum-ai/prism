@@ -74,6 +74,7 @@ $env:PRISM_POLICY_PROVIDER="prism_enterprise_dashboard.policy_provider:Published
 $env:PRISM_ENTERPRISE_POLICY_API_URL="http://127.0.0.1:8005"
 $env:PRISM_ENTERPRISE_POLICY_API_KEY="dev"
 $env:PRISM_ENTERPRISE_POLICY_TIMEOUT_SECONDS="2"
+$env:PRISM_POLICY_CACHE_TTL_SECONDS="30"
 uvicorn prism_gateway.main:app --reload --app-dir apps/gateway/src --host 127.0.0.1 --port 8004
 ```
 
@@ -87,4 +88,22 @@ docker compose -f docker\docker-compose.yml -f docker\docker-compose.enterprise.
 The override builds from `C:\Users\john_\Desktop` and expects sibling folders named `prism` and
 `prism-enterprise`. If the enterprise provider is unavailable or returns no active policy for the
 tenant/app pair, Prism falls back to its local policy behavior.
+
+Policy runtime cache invalidation is available through the gateway:
+
+```powershell
+$headers = @{
+  "X-Prism-Tenant"="tenant_dev"
+  "X-Prism-API-Key"="dev"
+}
+
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8004/v1/policies/cache/invalidate -Headers $headers -ContentType "application/json" -Body '{
+  "tenant_id": "tenant_dev",
+  "app_id": "pulse"
+}'
+```
+
+Set `PRISM_POLICY_CACHE_TTL_SECONDS=0` to disable policy caching. When caching is enabled, Prism
+keeps a last-known-good policy for each tenant/app pair and uses it if the configured provider
+temporarily returns no policy.
 
