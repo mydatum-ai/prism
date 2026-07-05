@@ -1,0 +1,18 @@
+domain: customer_support
+version: "1"
+rules:
+  - rule_id: support_customer
+    entity_type: person
+    action: tokenize
+    token_prefix: CUSTOMER
+    token_strategy: session_stable
+    rehydrate_roles: [support_manager, enterprise_admin]
+  - rule_id: support_email
+    entity_type: email
+    action: tokenize
+    token_prefix: EMAIL
+    rehydrate_roles: [support_agent, support_manager, enterprise_admin]
+  - rule_id: support_invoice
+    entity_type: invoice
+    action: tokenize
+    token_prefix: CASE

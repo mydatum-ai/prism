@@ -1,0 +1,17 @@
+domain: civic_reports
+version: "1"
+rules:
+  - rule_id: civic_reporter
+    entity_type: person
+    action: tokenize
+    token_prefix: REPORTER
+    token_strategy: session_stable
+    rehydrate_roles: [case_worker, enterprise_admin]
+  - rule_id: civic_email
+    entity_type: email
+    action: tokenize
+    token_prefix: EMAIL
+    rehydrate_roles: [case_worker, enterprise_admin]
+  - rule_id: civic_phone
+    entity_type: phone
+    action: mask

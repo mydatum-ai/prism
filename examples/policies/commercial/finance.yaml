@@ -1,0 +1,17 @@
+domain: finance
+version: "1"
+rules:
+  - rule_id: finance_customer
+    entity_type: person
+    action: tokenize
+    token_prefix: ACCOUNT_HOLDER
+    token_strategy: tenant_stable
+    rehydrate_roles: [finance_admin]
+  - rule_id: finance_email
+    entity_type: email
+    action: redact
+  - rule_id: finance_invoice
+    entity_type: invoice
+    action: tokenize
+    token_prefix: TRANSACTION
+    rehydrate_roles: [finance_admin]

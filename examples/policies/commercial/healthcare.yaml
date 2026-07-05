@@ -1,0 +1,18 @@
+domain: healthcare
+version: "1"
+rules:
+  - rule_id: healthcare_patient
+    entity_type: person
+    action: tokenize
+    token_prefix: PATIENT
+    token_strategy: random_opaque
+    rehydrate_roles: [clinician, enterprise_admin]
+    max_token_age_seconds: 86400
+  - rule_id: healthcare_email
+    entity_type: email
+    action: tokenize
+    token_prefix: CONTACT
+    rehydrate_roles: [clinician, enterprise_admin]
+  - rule_id: healthcare_phone
+    entity_type: phone
+    action: redact
