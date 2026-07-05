@@ -100,9 +100,32 @@ mypy .
 pytest -q
 ```
 
+### Phase 4: Gateway And Provider Adapter
+
+Status: completed
+
+Implemented:
+
+- OpenAI-compatible `POST /v1/chat/completions`.
+- Provider protocol and normalized provider response model.
+- `MockProvider`.
+- `OpenAIProvider` using the OpenAI chat completions API shape.
+- Gateway provider selection through `PRISM_PROVIDER`.
+- OpenAI API key and base URL configuration.
+- Full proxy flow: transform request messages, call provider, rehydrate provider output, return OpenAI-compatible response.
+- Network-free OpenAI provider tests using an HTTP mock transport.
+
+Verified:
+
+```powershell
+ruff format --check .
+ruff check .
+mypy .
+pytest -q
+```
+
 ## Pending
 
-- Phase 4: Gateway And Provider Adapter
 - Phase 5: Evaluation Core
 - Phase 6: Enterprise Plugin Loading
 - Phases 7-12: Enterprise-driven compatibility work

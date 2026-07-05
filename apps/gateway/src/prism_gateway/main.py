@@ -3,13 +3,20 @@ from prism_compiler.schemas import (
     ChatRequest,
     ChatResponse,
     HealthResponse,
+    OpenAIChatCompletionRequest,
+    OpenAIChatCompletionResponse,
     RehydrateRequest,
     RehydrateResponse,
     TransformRequest,
     TransformResponse,
 )
 
-from prism_gateway.routes import chat_mock_endpoint, rehydrate_endpoint, transform_endpoint
+from prism_gateway.routes import (
+    chat_completions_endpoint,
+    chat_mock_endpoint,
+    rehydrate_endpoint,
+    transform_endpoint,
+)
 
 app = FastAPI(
     title="Prism Gateway",
@@ -36,3 +43,10 @@ def rehydrate_route(request: RehydrateRequest) -> RehydrateResponse:
 @app.post("/v1/chat/mock", response_model=ChatResponse)
 def chat_mock_route(request: ChatRequest) -> ChatResponse:
     return chat_mock_endpoint(request)
+
+
+@app.post("/v1/chat/completions", response_model=OpenAIChatCompletionResponse)
+def chat_completions_route(
+    request: OpenAIChatCompletionRequest,
+) -> OpenAIChatCompletionResponse:
+    return chat_completions_endpoint(request)

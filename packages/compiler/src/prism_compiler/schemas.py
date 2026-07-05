@@ -81,3 +81,28 @@ class ChatResponse(BaseModel):
     request_id: str
     message: ChatMessage
     audit_event: AuditEvent
+
+
+class OpenAIChatCompletionRequest(BaseModel):
+    model: str
+    messages: list[ChatMessage]
+    metadata: dict[str, str] = Field(default_factory=dict)
+
+
+class OpenAIChatChoiceMessage(BaseModel):
+    role: Literal["assistant"]
+    content: str
+
+
+class OpenAIChatChoice(BaseModel):
+    index: int
+    message: OpenAIChatChoiceMessage
+    finish_reason: str = "stop"
+
+
+class OpenAIChatCompletionResponse(BaseModel):
+    id: str
+    object: Literal["chat.completion"] = "chat.completion"
+    created: int
+    model: str
+    choices: list[OpenAIChatChoice]

@@ -1,11 +1,18 @@
 import os
+import time
 from uuid import uuid4
 
+from fastapi import HTTPException
+from prism_compiler.providers import MockProvider, OpenAIProvider, Provider
 from prism_compiler.schemas import (
     AuditEvent,
     ChatMessage,
     ChatRequest,
     ChatResponse,
+    OpenAIChatChoice,
+    OpenAIChatChoiceMessage,
+    OpenAIChatCompletionRequest,
+    OpenAIChatCompletionResponse,
     RehydrateRequest,
     RehydrateResponse,
     TransformRequest,
@@ -21,6 +28,19 @@ def active_policy() -> Policy:
     if not policy_path:
         return DEFAULT_POLICY
     return load_policy(policy_path)
+
+
+def active_provider() -> Provider:
+    provider_name = os.getenv("PRISM_PROVIDER", "mock").lower()
+    if provider_name == "mock":
+        return MockProvider()
+    if provider_name == "openai":
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise HTTPException(status_code=500, detail="OPENAI_API_KEY is required")
+        base_url = os.getenv("PRISM_OPENAI_BASE_URL", "https://api.openai.com/v1")
+        return OpenAIProvider(api_key=api_key, base_url=base_url)
+    raise HTTPException(status_code=500, detail=f"Unsupported provider: {provider_name}")
 
 
 def transform_endpoint(request: TransformRequest) -> TransformResponse:
@@ -65,4 +85,51 @@ def chat_mock_endpoint(request: ChatRequest) -> ChatResponse:
             session_id=request.session_id,
             request_id=request_id,
         ),
+    )
+
+
+def chat_completions_endpoint(
+    request: OpenAIChatCompletionRequest,
+    provider: Provider | None = None,
+) -> OpenAIChatCompletionResponse:
+    tenant_id = request.metadata.get("tenant_id", "default")
+    app_id = request.metadata.get("app_id", "default")
+    session_id = request.metadata.get("session_id", str(uuid4()))
+    policy = active_policy()
+    transformed_messages = [
+        ChatMessage(
+            role=message.role,
+            content=transform(
+                TransformRequest(
+                    tenant_id=tenant_id,
+                    app_id=app_id,
+                    session_id=session_id,
+                    text=message.content,
+                ),
+                policy=policy,
+            ).transformed_text,
+        )
+        for message in request.messages
+    ]
+    provider_response = (provider or active_provider()).complete(
+        request.model, transformed_messages
+    )
+    rehydrated = rehydrate(
+        RehydrateRequest(
+            tenant_id=tenant_id,
+            app_id=app_id,
+            session_id=session_id,
+            text=provider_response.content,
+        )
+    )
+    return OpenAIChatCompletionResponse(
+        id=f"chatcmpl-{uuid4().hex}",
+        created=int(time.time()),
+        model=provider_response.model,
+        choices=[
+            OpenAIChatChoice(
+                index=0,
+                message=OpenAIChatChoiceMessage(role="assistant", content=rehydrated.text),
+            )
+        ],
     )
