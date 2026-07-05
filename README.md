@@ -23,5 +23,6 @@ pytest
 Run the gateway:
 
 ```powershell
-uvicorn prism_gateway.main:app --reload --app-dir apps/gateway/src --host 127.0.0.1 --port 8000
+uvicorn prism_gateway.main:app --reload --app-dir apps/gateway/src --host 127.0.0.1 --port 8004
 ```
+

@@ -114,13 +114,13 @@ pytest tests/test_gateway.py -q
 
 ```powershell
 $env:PRISM_PROVIDER="mock"
-uvicorn prism_gateway.main:app --reload --app-dir apps/gateway/src --host 127.0.0.1 --port 8000
+uvicorn prism_gateway.main:app --reload --app-dir apps/gateway/src --host 127.0.0.1 --port 8004
 ```
 
 Health check:
 
 ```powershell
-Invoke-RestMethod -Method Get -Uri http://127.0.0.1:8000/healthz
+Invoke-RestMethod -Method Get -Uri http://127.0.0.1:8004/healthz
 ```
 
 ## Transform MVP Requests
@@ -128,7 +128,7 @@ Invoke-RestMethod -Method Get -Uri http://127.0.0.1:8000/healthz
 Transform:
 
 ```powershell
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/v1/transform -ContentType "application/json" -Body '{
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8004/v1/transform -ContentType "application/json" -Body '{
   "tenant_id": "tenant_dev",
   "app_id": "pulse",
   "session_id": "session_1",
@@ -160,7 +160,7 @@ Manual smoke:
 
 ```powershell
 $env:PRISM_PROVIDER="mock"
-uvicorn prism_gateway.main:app --reload --app-dir apps/gateway/src --host 127.0.0.1 --port 8000
+uvicorn prism_gateway.main:app --reload --app-dir apps/gateway/src --host 127.0.0.1 --port 8004
 ```
 
 In another shell, run the transform, rehydrate, and mock chat requests in this document. Then finish with the required phase workflow commit and push:
@@ -174,7 +174,7 @@ git push origin main
 Rehydrate:
 
 ```powershell
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/v1/rehydrate -ContentType "application/json" -Body '{
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8004/v1/rehydrate -ContentType "application/json" -Body '{
   "tenant_id": "tenant_dev",
   "app_id": "pulse",
   "session_id": "session_1",
@@ -185,7 +185,7 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/v1/rehydrate -ContentT
 Mock chat:
 
 ```powershell
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/v1/chat/mock -ContentType "application/json" -Body '{
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8004/v1/chat/mock -ContentType "application/json" -Body '{
   "tenant_id": "tenant_dev",
   "app_id": "pulse",
   "session_id": "session_1",
@@ -297,7 +297,7 @@ pytest tests/test_provider_openai.py -q
 Manual OpenAI-compatible gateway smoke:
 
 ```powershell
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/v1/chat/completions -ContentType "application/json" -Body '{
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8004/v1/chat/completions -ContentType "application/json" -Body '{
   "model": "mock",
   "messages": [
     { "role": "user", "content": "John Smith emailed john@email.com" }
@@ -328,7 +328,7 @@ Manual smoke:
 
 ```powershell
 $env:PRISM_PROVIDER="mock"
-uvicorn prism_gateway.main:app --reload --app-dir apps/gateway/src --host 127.0.0.1 --port 8000
+uvicorn prism_gateway.main:app --reload --app-dir apps/gateway/src --host 127.0.0.1 --port 8004
 ```
 
 Run the OpenAI-compatible gateway request above, then commit and push:
@@ -487,3 +487,4 @@ After every push:
 ```powershell
 git status --short --branch
 ```
+
