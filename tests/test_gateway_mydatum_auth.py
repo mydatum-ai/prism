@@ -29,27 +29,30 @@ def test_auth_login_requires_mydatum_configuration(monkeypatch: pytest.MonkeyPat
     assert response.json()["detail"] == "mydatum_not_configured"
 
 
-def test_mydatum_provider_supports_internal_discovery_url(
+def test_mydatum_provider_supports_internal_server_endpoints(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("MYDATUM_ISSUER", "http://localhost:8000")
     monkeypatch.setenv("MYDATUM_CLIENT_ID", "client")
     monkeypatch.setenv("MYDATUM_CLIENT_SECRET", "secret")
     monkeypatch.setenv("MYDATUM_REDIRECT_URI", "http://127.0.0.1:8004/auth/callback")
-    monkeypatch.setenv(
-        "MYDATUM_DISCOVERY_URL",
-        "http://host.docker.internal:8000/.well-known/openid-configuration",
-    )
+    monkeypatch.setenv("MYDATUM_INTERNAL_BASE_URL", "http://host.docker.internal:8000")
 
     registered: dict[str, object] = {}
     monkeypatch.setattr(auth.oauth, "create_client", lambda _name: None)
-    monkeypatch.setattr(auth.oauth, "register", lambda **kwargs: registered.update(kwargs) or object())
+    monkeypatch.setattr(
+        auth.oauth,
+        "register",
+        lambda **kwargs: registered.update(kwargs) or object(),
+    )
 
     auth.mydatum_provider()
 
-    assert registered["server_metadata_url"] == (
-        "http://host.docker.internal:8000/.well-known/openid-configuration"
-    )
+    metadata = registered["server_metadata"]
+    assert isinstance(metadata, dict)
+    assert registered["authorize_url"] == "http://localhost:8000/o/authorize"
+    assert registered["access_token_url"] == "http://host.docker.internal:8000/o/token"
+    assert metadata["jwks_uri"] == "http://host.docker.internal:8000/.well-known/jwks.json"
     assert registered["client_id"] == "client"
 
 

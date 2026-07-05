@@ -47,12 +47,25 @@ def mydatum_provider() -> Any:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="mydatum_not_configured"
         )
     issuer = setting("MYDATUM_ISSUER").rstrip("/")
-    discovery_url = setting("MYDATUM_DISCOVERY_URL", f"{issuer}/.well-known/openid-configuration")
+    internal_base_url = setting("MYDATUM_INTERNAL_BASE_URL")
+    if not internal_base_url and setting("MYDATUM_DISCOVERY_URL"):
+        internal_base_url = setting("MYDATUM_DISCOVERY_URL").removesuffix(
+            "/.well-known/openid-configuration"
+        )
+    server_base_url = (internal_base_url or issuer).rstrip("/")
     return oauth.create_client("mydatum") or oauth.register(
         name="mydatum",
         client_id=setting("MYDATUM_CLIENT_ID"),
         client_secret=setting("MYDATUM_CLIENT_SECRET"),
-        server_metadata_url=discovery_url,
+        authorize_url=f"{issuer}/o/authorize",
+        access_token_url=f"{server_base_url}/o/token",
+        server_metadata={
+            "issuer": issuer,
+            "authorization_endpoint": f"{issuer}/o/authorize",
+            "token_endpoint": f"{server_base_url}/o/token",
+            "userinfo_endpoint": f"{server_base_url}/o/userinfo",
+            "jwks_uri": f"{server_base_url}/.well-known/jwks.json",
+        },
         client_kwargs={"scope": setting("MYDATUM_SCOPES", "openid email")},
     )
 
