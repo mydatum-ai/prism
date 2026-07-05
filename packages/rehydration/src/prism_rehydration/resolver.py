@@ -14,6 +14,14 @@ from prism_policy_runtime import (
     RehydrationDecisionContext,
     decide_rehydration,
 )
+from prism_transaction_events import (
+    RehydrationDecisionSummary,
+    RehydrationTransactionEvent,
+    ReviewScores,
+    TransactionEventSink,
+    emit_transaction_event,
+)
+from prism_transaction_events.events import fingerprint_text
 from prism_vault_core import GLOBAL_VAULT, InMemoryVault, VaultKey
 
 TOKEN_PATTERN = re.compile(r"\b[A-Z][A-Z0-9_]*_[A-Z0-9]+\b")
@@ -23,6 +31,7 @@ def rehydrate(
     request: RehydrateRequest,
     vault: InMemoryVault = GLOBAL_VAULT,
     policy: Policy = DEFAULT_POLICY,
+    transaction_sink: TransactionEventSink | None = None,
 ) -> RehydrateResponse:
     request_id = str(uuid4())
     diagnostics: list[RehydrationDiagnostic] = []
@@ -111,9 +120,53 @@ def rehydrate(
             "blocked_count": str(sum(1 for item in diagnostics if item.status != "allowed")),
         }
     )
-    return RehydrateResponse(
+    response = RehydrateResponse(
         request_id=request_id,
         text=text,
         diagnostics=diagnostics,
         audit_event=audit_event,
+    )
+    emit_transaction_event(
+        _transaction_event_for_rehydrate(request, response, policy),
+        transaction_sink,
+    )
+    return response
+
+
+def _transaction_event_for_rehydrate(
+    request: RehydrateRequest,
+    response: RehydrateResponse,
+    policy: Policy,
+) -> RehydrationTransactionEvent:
+    blocked = [item for item in response.diagnostics if item.status != "allowed"]
+    return RehydrationTransactionEvent(
+        tenant_id=request.tenant_id,
+        app_id=request.app_id,
+        session_id=request.session_id,
+        request_id=response.request_id,
+        environment=request.environment,
+        policy_id=policy.policy_id,
+        policy_version=policy.version,
+        input_fingerprint=fingerprint_text(request.text),
+        requested_text_preview=request.text,
+        rehydrated_preview=response.text,
+        requester_roles=request.roles,
+        purpose=request.purpose,
+        decisions=[
+            RehydrationDecisionSummary(
+                token=item.token,
+                entity_type=item.entity_type,
+                allowed=item.status == "allowed",
+                reason=item.reason,
+                status=item.status,
+            )
+            for item in response.diagnostics
+        ],
+        warnings=[f"{item.entity_type or 'unknown'}:{item.status}" for item in blocked],
+        scores=ReviewScores(
+            rehydration_risk=0.8 if blocked else 0.0,
+            unresolved_token_count=len(blocked),
+            explanations=[f"{item.token}:{item.status}:{item.reason}" for item in blocked]
+            or ["rehydration completed without blocked tokens"],
+        ),
     )
