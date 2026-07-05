@@ -1,3 +1,5 @@
+from datetime import UTC, datetime, timedelta
+
 import httpx
 import pytest
 from prism_compiler.schemas import EntityDetection
@@ -6,8 +8,10 @@ from prism_policy_runtime import (
     Policy,
     PolicyDecisionContext,
     PublishedPolicyProvider,
+    RehydrationDecisionContext,
     clear_policy_cache,
     decide,
+    decide_rehydration,
     load_policy,
     load_policy_provider,
     resolve_policy,
@@ -321,6 +325,41 @@ def test_p16_rule_matching_uses_context_and_confidence_threshold() -> None:
 
     assert fallback.rule_id == "fallback_email"
     assert fallback.action == "mask"
+
+
+def test_p16_rehydration_policy_blocks_by_role_and_token_age() -> None:
+    policy = Policy.model_validate(
+        {
+            "domain": "rehydrate",
+            "rules": [
+                {
+                    "rule_id": "fresh_admin_email",
+                    "entity_type": "email",
+                    "action": "tokenize",
+                    "rehydrate_roles": ["admin"],
+                    "max_token_age_seconds": 60,
+                }
+            ],
+        }
+    )
+
+    role_blocked = decide_rehydration(
+        policy,
+        entity_type="email",
+        created_at=datetime.now(UTC),
+        context=RehydrationDecisionContext(roles=["viewer"]),
+    )
+    expired = decide_rehydration(
+        policy,
+        entity_type="email",
+        created_at=datetime.now(UTC) - timedelta(seconds=120),
+        context=RehydrationDecisionContext(roles=["admin"]),
+    )
+
+    assert role_blocked.allowed is False
+    assert role_blocked.reason == "role_not_allowed"
+    assert expired.allowed is False
+    assert expired.reason == "token_age_exceeded"
 
 
 def test_phase_p15_default_policy_provider_preserves_current_policy() -> None:

@@ -71,7 +71,10 @@ def transform_endpoint(request: TransformRequest) -> TransformResponse:
 
 
 def rehydrate_endpoint(request: RehydrateRequest) -> RehydrateResponse:
-    return rehydrate(request)
+    resolution = active_policy_resolution(request.tenant_id, request.app_id)
+    response = rehydrate(request, policy=resolution.policy)
+    response.audit_event.metadata.update(policy_audit_metadata(resolution))
+    return response
 
 
 def chat_mock_endpoint(request: ChatRequest) -> ChatResponse:
@@ -96,7 +99,8 @@ def chat_mock_endpoint(request: ChatRequest) -> ChatResponse:
             app_id=request.app_id,
             session_id=request.session_id,
             text=provider_text,
-        )
+        ),
+        policy=resolution.policy,
     )
     request_id = str(uuid4())
     return ChatResponse(
@@ -147,7 +151,8 @@ def chat_completions_endpoint(
             app_id=app_id,
             session_id=session_id,
             text=provider_response.content,
-        )
+        ),
+        policy=resolution.policy,
     )
     return OpenAIChatCompletionResponse(
         id=f"chatcmpl-{uuid4().hex}",

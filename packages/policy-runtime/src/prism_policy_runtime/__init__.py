@@ -6,7 +6,10 @@ from prism_policy_runtime.policy import (
     PolicyDecision,
     PolicyDecisionContext,
     PolicyRule,
+    RehydrationDecisionContext,
+    RehydrationPolicyDecision,
     decide,
+    decide_rehydration,
     load_policy,
 )
 from prism_policy_runtime.providers import (
@@ -30,8 +33,11 @@ __all__ = [
     "PolicyResolution",
     "PolicyRule",
     "PublishedPolicyProvider",
+    "RehydrationDecisionContext",
+    "RehydrationPolicyDecision",
     "clear_policy_cache",
     "decide",
+    "decide_rehydration",
     "load_policy",
     "load_policy_provider",
     "resolve_policy",

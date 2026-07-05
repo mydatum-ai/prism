@@ -47,7 +47,7 @@ class RedisVault:
         record = self.get_record(key)
         return record.value if record is not None else None
 
-    def get_record(self, key: VaultKey) -> VaultRecord | None:
+    def get_record(self, key: VaultKey, *, include_expired: bool = False) -> VaultRecord | None:
         raw = self._client.get(key.as_string())
         if raw is None:
             return None

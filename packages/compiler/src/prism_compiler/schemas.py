@@ -94,11 +94,31 @@ class RehydrateRequest(BaseModel):
     app_id: str
     session_id: str
     text: str
+    roles: list[str] = Field(default_factory=list)
+    purpose: str | None = None
+    direction: str | None = None
+    environment: str | None = None
+    allowed_entity_types: list[str] | None = None
+
+
+class RehydrationDiagnostic(BaseModel):
+    token: str
+    entity_type: str | None = None
+    status: Literal[
+        "allowed",
+        "denied",
+        "expired",
+        "missing_mapping",
+        "wrong_scope",
+        "policy_blocked",
+    ]
+    reason: str
 
 
 class RehydrateResponse(BaseModel):
     request_id: str
     text: str
+    diagnostics: list[RehydrationDiagnostic] = Field(default_factory=list)
     audit_event: AuditEvent
 
 

@@ -55,16 +55,24 @@ class InMemoryVault:
         record = self.get_record(key)
         return record.value if record is not None else None
 
-    def get_record(self, key: VaultKey) -> VaultRecord | None:
+    def get_record(self, key: VaultKey, *, include_expired: bool = False) -> VaultRecord | None:
         with self._lock:
             key_string = key.as_string()
             record = self._values.get(key_string)
             if record is None:
                 return None
-            if record.expired:
+            if record.expired and not include_expired:
                 del self._values[key_string]
                 return None
             return record
+
+    def token_exists_outside_scope(self, key: VaultKey) -> bool:
+        suffix = f":{key.token}"
+        scoped = key.as_string()
+        with self._lock:
+            return any(
+                key_string != scoped and key_string.endswith(suffix) for key_string in self._values
+            )
 
     def clear(self) -> None:
         with self._lock:
