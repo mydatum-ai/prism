@@ -11,6 +11,7 @@ from prism_compiler.schemas import (
     TransformResponse,
 )
 from prism_detectors import EmailDetector, InvoiceDetector, PhoneDetector, SimpleNameDetector
+from prism_policy_runtime import DEFAULT_POLICY, Policy, PolicyDecision, decide
 from prism_vault_core import GLOBAL_VAULT, InMemoryVault, VaultKey
 
 TOKEN_PREFIXES = {
@@ -40,7 +41,11 @@ def detect_entities(
     return _remove_overlaps(sorted(detections, key=lambda item: (item.start, item.end)))
 
 
-def transform(request: TransformRequest, vault: InMemoryVault = GLOBAL_VAULT) -> TransformResponse:
+def transform(
+    request: TransformRequest,
+    vault: InMemoryVault = GLOBAL_VAULT,
+    policy: Policy = DEFAULT_POLICY,
+) -> TransformResponse:
     request_id = str(uuid4())
     detections = detect_entities(request.text)
     counters: Counter[str] = Counter()
@@ -54,23 +59,25 @@ def transform(request: TransformRequest, vault: InMemoryVault = GLOBAL_VAULT) ->
         unchanged = request.text[cursor : detection.start]
         transformed_parts.append(unchanged)
         transformed_cursor += len(unchanged)
+        decision = decide(policy, detection)
         counters[detection.entity_type] += 1
-        token = _token_for(detection.entity_type, counters[detection.entity_type])
-        transformed_parts.append(token)
+        replacement = _replacement_for(detection, counters[detection.entity_type], decision)
+        transformed_parts.append(replacement)
         cursor = detection.end
         token_start = transformed_cursor
-        transformed_cursor += len(token)
+        transformed_cursor += len(replacement)
 
-        vault.put(
-            VaultKey(request.tenant_id, request.app_id, request.session_id, token),
-            detection.text,
-            entity_type=detection.entity_type,
-            metadata={"request_id": request_id},
-        )
-        mappings.append(TokenMapping(token=token, entity_type=detection.entity_type))
+        if decision.action == "tokenize":
+            vault.put(
+                VaultKey(request.tenant_id, request.app_id, request.session_id, replacement),
+                detection.text,
+                entity_type=detection.entity_type,
+                metadata={"request_id": request_id, "policy_id": decision.policy_id},
+            )
+            mappings.append(TokenMapping(token=replacement, entity_type=detection.entity_type))
         response_detections.append(
             EntityDetection(
-                text=token,
+                text=replacement,
                 entity_type=detection.entity_type,
                 start=token_start,
                 end=transformed_cursor,
@@ -85,7 +92,8 @@ def transform(request: TransformRequest, vault: InMemoryVault = GLOBAL_VAULT) ->
         app_id=request.app_id,
         session_id=request.session_id,
         request_id=request_id,
-        policy_id=request.policy_id,
+        policy_id=request.policy_id or policy.policy_id,
+        policy_version=policy.version,
     )
     return TransformResponse(
         request_id=request_id,
@@ -99,6 +107,26 @@ def transform(request: TransformRequest, vault: InMemoryVault = GLOBAL_VAULT) ->
 def _token_for(entity_type: str, index: int) -> str:
     prefix = TOKEN_PREFIXES.get(entity_type, entity_type.upper())
     return f"{prefix}_{index}"
+
+
+def _replacement_for(detection: EntityDetection, index: int, decision: PolicyDecision) -> str:
+    action = decision.action
+    if action == "preserve":
+        return detection.text
+    if action == "tokenize":
+        prefix = decision.token_prefix or TOKEN_PREFIXES.get(
+            detection.entity_type, detection.entity_type.upper()
+        )
+        return f"{prefix}_{index}"
+    if action == "mask":
+        return decision.replacement or f"[MASKED_{detection.entity_type.upper()}]"
+    if action == "generalize":
+        return decision.replacement or detection.entity_type
+    if action == "abstract":
+        return decision.replacement or f"[{detection.entity_type.upper()}]"
+    if action == "block":
+        return decision.replacement or "[BLOCKED]"
+    return _token_for(detection.entity_type, index)
 
 
 def _remove_overlaps(detections: list[EntityDetection]) -> list[EntityDetection]:

@@ -18,6 +18,7 @@ dev = [
     "mypy>=1.10.0",
     "pytest>=8.2.0",
     "ruff>=0.5.0",
+    "types-PyYAML>=6.0.0",
 ]
 
 [project.scripts]
@@ -79,4 +80,3 @@ mypy_path = [
     "packages/transformers/src",
     "packages/vault-core/src",
 ]
-

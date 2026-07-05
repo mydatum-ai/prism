@@ -1,3 +1,4 @@
+import os
 from uuid import uuid4
 
 from prism_compiler.schemas import (
@@ -10,12 +11,20 @@ from prism_compiler.schemas import (
     TransformRequest,
     TransformResponse,
 )
+from prism_policy_runtime import DEFAULT_POLICY, Policy, load_policy
 from prism_rehydration import rehydrate
 from prism_transformers import transform
 
 
+def active_policy() -> Policy:
+    policy_path = os.getenv("PRISM_POLICY_PATH")
+    if not policy_path:
+        return DEFAULT_POLICY
+    return load_policy(policy_path)
+
+
 def transform_endpoint(request: TransformRequest) -> TransformResponse:
-    return transform(request)
+    return transform(request, policy=active_policy())
 
 
 def rehydrate_endpoint(request: RehydrateRequest) -> RehydrateResponse:
@@ -30,7 +39,8 @@ def chat_mock_endpoint(request: ChatRequest) -> ChatResponse:
                 app_id=request.app_id,
                 session_id=request.session_id,
                 text=message.content,
-            )
+            ),
+            policy=active_policy(),
         )
         for message in request.messages
     ]

@@ -76,9 +76,32 @@ pytest -q
 pytest tests/integration/test_redis_vault_integration.py -q
 ```
 
+### Phase 3: Policy Runtime
+
+Status: completed
+
+Implemented:
+
+- YAML policy loader and Pydantic validation.
+- Policy rules with entity type, role, action, token prefix, and replacement fields.
+- Actions: `preserve`, `tokenize`, `mask`, `generalize`, `abstract`, and `block`.
+- Default policy matching Phase 1 token behavior.
+- Policy-driven transformation pipeline.
+- Gateway policy loading through `PRISM_POLICY_PATH`.
+- Policy id and version in transform audit events.
+- Example `pulse` and `support` policies.
+
+Verified:
+
+```powershell
+ruff format --check .
+ruff check .
+mypy .
+pytest -q
+```
+
 ## Pending
 
-- Phase 3: Policy Runtime
 - Phase 4: Gateway And Provider Adapter
 - Phase 5: Evaluation Core
 - Phase 6: Enterprise Plugin Loading

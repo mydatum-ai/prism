@@ -1,0 +1,13 @@
+domain: pulse
+version: "1"
+rules:
+  - entity_type: person
+    action: tokenize
+    token_prefix: RESIDENT
+  - entity_type: email
+    action: tokenize
+    token_prefix: EMAIL
+  - entity_type: invoice
+    action: preserve
+  - entity_type: phone
+    action: mask

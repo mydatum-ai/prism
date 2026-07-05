@@ -1,0 +1,13 @@
+domain: support
+version: "1"
+rules:
+  - entity_type: person
+    action: generalize
+    replacement: customer
+  - entity_type: email
+    action: mask
+  - entity_type: invoice
+    action: tokenize
+    token_prefix: CASE
+  - entity_type: phone
+    action: block
