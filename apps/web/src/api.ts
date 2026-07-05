@@ -16,11 +16,26 @@ export type AuditResponse = {
   events: Array<{ request_id: string; event_type: string; app_id: string; session_id: string }>;
 };
 
-const authHeaders = (tenantId: string, apiKey: string) => ({
-  "Content-Type": "application/json",
-  "X-Prism-Tenant": tenantId,
-  "X-Prism-API-Key": apiKey
-});
+export type AuthMeResponse = {
+  authenticated: boolean;
+  account: {
+    tenant_id: string;
+    email?: string | null;
+    name?: string | null;
+    subject: string;
+  };
+};
+
+export const loginUrl = `${API_BASE_URL}/auth/login`;
+
+const authHeaders = (tenantId: string, apiKey: string) => {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (apiKey.trim()) {
+    headers["X-Prism-Tenant"] = tenantId;
+    headers["X-Prism-API-Key"] = apiKey;
+  }
+  return headers;
+};
 
 export async function transformText(params: {
   tenantId: string;
@@ -32,6 +47,7 @@ export async function transformText(params: {
   const response = await fetch(`${API_BASE_URL}/v1/transform`, {
     method: "POST",
     headers: authHeaders(params.tenantId, params.apiKey),
+    credentials: "include",
     body: JSON.stringify({
       tenant_id: params.tenantId,
       app_id: params.appId,
@@ -53,6 +69,7 @@ export async function chatMock(params: {
   const response = await fetch(`${API_BASE_URL}/v1/chat/mock`, {
     method: "POST",
     headers: authHeaders(params.tenantId, params.apiKey),
+    credentials: "include",
     body: JSON.stringify({
       tenant_id: params.tenantId,
       app_id: params.appId,
@@ -66,8 +83,20 @@ export async function chatMock(params: {
 
 export async function getAudit(tenantId: string, apiKey: string): Promise<AuditResponse> {
   const response = await fetch(`${API_BASE_URL}/v1/audit/${encodeURIComponent(tenantId)}`, {
-    headers: authHeaders(tenantId, apiKey)
+    headers: authHeaders(tenantId, apiKey),
+    credentials: "include"
   });
   if (!response.ok) throw new Error(`Audit failed: ${response.status}`);
   return (await response.json()) as AuditResponse;
+}
+
+export async function getAuthMe(): Promise<AuthMeResponse | null> {
+  const response = await fetch(`${API_BASE_URL}/auth/me`, { credentials: "include" });
+  if (response.status === 401) return null;
+  if (!response.ok) throw new Error(`Auth check failed: ${response.status}`);
+  return (await response.json()) as AuthMeResponse;
+}
+
+export async function logout(): Promise<void> {
+  await fetch(`${API_BASE_URL}/auth/logout`, { method: "POST", credentials: "include" });
 }

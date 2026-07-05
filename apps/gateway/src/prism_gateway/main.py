@@ -1,6 +1,7 @@
 from typing import Annotated
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from prism_compiler.schemas import (
     ChatRequest,
     ChatResponse,
@@ -12,8 +13,18 @@ from prism_compiler.schemas import (
     TransformRequest,
     TransformResponse,
 )
+from starlette.middleware.sessions import SessionMiddleware
 
-from prism_gateway.auth import Principal, authenticate, require_tenant
+from prism_gateway.auth import (
+    Principal,
+    authenticate,
+    callback,
+    login,
+    logout,
+    me,
+    require_tenant,
+    setting,
+)
 from prism_gateway.routes import (
     chat_completions_endpoint,
     chat_mock_endpoint,
@@ -27,11 +38,44 @@ app = FastAPI(
     version="0.1.0",
     description="Open-core privacy transformation gateway.",
 )
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=setting("PRISM_SESSION_SECRET", "replace-this-development-secret"),
+    same_site="lax",
+    https_only=setting("PRISM_SESSION_COOKIE_SECURE", "false").lower() == "true",
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://127.0.0.1:3004", "http://localhost:3004"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/healthz", response_model=HealthResponse)
 def healthz() -> HealthResponse:
     return HealthResponse(status="ok", service="prism-gateway")
+
+
+@app.get("/auth/login")
+async def auth_login(request: Request) -> object:
+    return await login(request)
+
+
+@app.get("/auth/callback")
+async def auth_callback(request: Request) -> object:
+    return await callback(request)
+
+
+@app.get("/auth/me")
+def auth_me(request: Request) -> dict[str, object]:
+    return me(request)
+
+
+@app.post("/auth/logout")
+def auth_logout(request: Request) -> object:
+    return logout(request)
 
 
 @app.post("/v1/transform", response_model=TransformResponse)

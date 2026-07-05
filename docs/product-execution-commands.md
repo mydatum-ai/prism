@@ -20,6 +20,7 @@ ruff format --check .
 ruff check .
 mypy .
 pytest tests\test_gateway_auth.py
+pytest tests\test_gateway_mydatum_auth.py
 ```
 
 ## Phase P3: Persisted Storage

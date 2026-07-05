@@ -43,6 +43,30 @@ label {
   font-size: 13px;
 }
 
+.auth-panel {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+.auth-panel a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 6px;
+  color: #f7fafc;
+  text-decoration: none;
+}
+
+.auth-panel span {
+  color: #dbe4ef;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
 input, textarea {
   width: 100%;
   border: 1px solid #c9d2df;

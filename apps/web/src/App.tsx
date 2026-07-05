@@ -1,7 +1,18 @@
 import { Activity, Bot, Database, Play, ShieldCheck } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import { chatMock, getAudit, transformText, type AuditResponse, type ChatResponse, type TransformResponse } from "./api";
+import {
+  chatMock,
+  getAudit,
+  getAuthMe,
+  loginUrl,
+  logout,
+  transformText,
+  type AuditResponse,
+  type AuthMeResponse,
+  type ChatResponse,
+  type TransformResponse
+} from "./api";
 
 const defaultPrompt = "Maria Santos emailed maria@example.com about the flood near 12 Rizal Street.";
 
@@ -12,10 +23,25 @@ export function App() {
   const [transform, setTransform] = useState<TransformResponse | null>(null);
   const [chat, setChat] = useState<ChatResponse | null>(null);
   const [audit, setAudit] = useState<AuditResponse | null>(null);
+  const [auth, setAuth] = useState<AuthMeResponse | null>(null);
   const [status, setStatus] = useState("Ready");
 
   const sessionId = "web-session";
   const appId = "web";
+
+  useEffect(() => {
+    void getAuthMe()
+      .then((result) => {
+        setAuth(result);
+        if (result?.account.tenant_id) setTenantId(result.account.tenant_id);
+      })
+      .catch(() => setAuth(null));
+  }, []);
+
+  async function signOut() {
+    await logout();
+    setAuth(null);
+  }
 
   async function runTransform() {
     setStatus("Transforming");
@@ -56,6 +82,14 @@ export function App() {
           API key
           <input value={apiKey} onChange={(event) => setApiKey(event.target.value)} />
         </label>
+        <div className="auth-panel">
+          <span>{auth ? auth.account.email || auth.account.subject : "Not signed in with MyDatum"}</span>
+          {auth ? (
+            <button type="button" onClick={signOut}>Logout</button>
+          ) : (
+            <a href={loginUrl}>Login with MyDatum</a>
+          )}
+        </div>
       </aside>
 
       <section className="workspace">

@@ -18,9 +18,11 @@ Status: completed
 ### Actions
 
 1. Add API-key based FastAPI dependencies for local/dev authentication.
-2. Require tenant headers on protected API routes.
-3. Reject cross-tenant request bodies.
-4. Add tests for accepted and rejected tenant access.
+2. Add MyDatum OIDC login, callback, current-user, and logout routes.
+3. Support MyDatum session cookies for browser access.
+4. Require tenant headers or MyDatum tenant claims on protected API routes.
+5. Reject cross-tenant request bodies.
+6. Add tests for accepted and rejected tenant access plus MyDatum claim mapping.
 
 ## Phase P3: Persisted Storage
 
