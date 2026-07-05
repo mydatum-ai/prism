@@ -16,6 +16,17 @@ export type AuditResponse = {
   events: Array<{ request_id: string; event_type: string; app_id: string; session_id: string }>;
 };
 
+export type RuntimePolicyStatusResponse = {
+  tenant_id: string;
+  app_id: string;
+  policy_id: string;
+  policy_version: string;
+  policy_source: "enterprise" | "cache" | "fallback" | "local";
+  policy_cache_hit: boolean;
+  policy_cache_stale: boolean;
+  policy_provider_latency_ms: number;
+};
+
 export type AuthMeResponse = {
   authenticated: boolean;
   account: {
@@ -88,6 +99,23 @@ export async function getAudit(tenantId: string, apiKey: string): Promise<AuditR
   });
   if (!response.ok) throw new Error(`Audit failed: ${response.status}`);
   return (await response.json()) as AuditResponse;
+}
+
+export async function getRuntimePolicyStatus(params: {
+  tenantId: string;
+  apiKey: string;
+  appId: string;
+}): Promise<RuntimePolicyStatusResponse> {
+  const search = new URLSearchParams({
+    tenant_id: params.tenantId,
+    app_id: params.appId
+  });
+  const response = await fetch(`${API_BASE_URL}/v1/policies/runtime/status?${search}`, {
+    headers: authHeaders(params.tenantId, params.apiKey),
+    credentials: "include"
+  });
+  if (!response.ok) throw new Error(`Runtime policy status failed: ${response.status}`);
+  return (await response.json()) as RuntimePolicyStatusResponse;
 }
 
 export async function getAuthMe(): Promise<AuthMeResponse | null> {

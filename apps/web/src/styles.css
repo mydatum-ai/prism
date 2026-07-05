@@ -135,7 +135,7 @@ button:hover { background: #f4f7fa; }
 }
 .result p { margin-top: 8px; line-height: 1.45; }
 
-.metric-grid {
+.metric-grid, .runtime-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
@@ -149,6 +149,18 @@ button:hover { background: #f4f7fa; }
   padding: 16px;
 }
 .metric-grid strong { grid-column: 1 / -1; font-size: 28px; }
+
+.runtime-grid { margin-bottom: 0; }
+.metric-line {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid #e1e6ee;
+  border-radius: 6px;
+  background: #f9fafc;
+}
+.metric-line span { color: #768295; font-size: 13px; }
+.metric-line strong { overflow-wrap: anywhere; font-size: 15px; }
 
 .table-wrap { overflow-x: auto; }
 table { width: 100%; min-width: 680px; border-collapse: collapse; }
