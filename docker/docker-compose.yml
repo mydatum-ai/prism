@@ -6,17 +6,13 @@ services:
     build:
       context: ..
       dockerfile: docker/gateway.Dockerfile
+    env_file:
+      - ../.env
     environment:
       PRISM_PROVIDER: mock
       PRISM_AUDIT_DB: /data/audit.sqlite3
       PRISM_API_KEYS: ${PRISM_API_KEYS:-tenant_dev:dev}
       PRISM_SESSION_SECRET: ${PRISM_SESSION_SECRET:-replace-this-development-secret}
-      MYDATUM_ISSUER: ${MYDATUM_ISSUER:-}
-      MYDATUM_CLIENT_ID: ${MYDATUM_CLIENT_ID:-}
-      MYDATUM_CLIENT_SECRET: ${MYDATUM_CLIENT_SECRET:-}
-      MYDATUM_REDIRECT_URI: ${MYDATUM_REDIRECT_URI:-http://127.0.0.1:8004/auth/callback}
-      MYDATUM_DISCOVERY_URL: ${MYDATUM_DISCOVERY_URL:-}
-      MYDATUM_SCOPES: ${MYDATUM_SCOPES:-openid email mydatum.roles}
     ports:
       - "8004:8004"
     volumes:
