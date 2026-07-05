@@ -18,6 +18,12 @@ class EntityDetection(BaseModel):
     metadata: dict[str, str] = Field(default_factory=dict)
 
 
+class TokenMapping(BaseModel):
+    token: str
+    original: str
+    entity_type: str
+
+
 class AuditEvent(BaseModel):
     event_type: str
     tenant_id: str
@@ -42,6 +48,7 @@ class TransformResponse(BaseModel):
     request_id: str
     transformed_text: str
     detections: list[EntityDetection] = Field(default_factory=list)
+    mappings: list[TokenMapping] = Field(default_factory=list)
     audit_event: AuditEvent
 
 

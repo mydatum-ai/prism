@@ -9,6 +9,7 @@ from prism_compiler.schemas import (
     HealthResponse,
     RehydrateRequest,
     RehydrateResponse,
+    TokenMapping,
     TransformRequest,
     TransformResponse,
 )
@@ -22,6 +23,7 @@ __all__ = [
     "HealthResponse",
     "RehydrateRequest",
     "RehydrateResponse",
+    "TokenMapping",
     "TransformRequest",
     "TransformResponse",
 ]
