@@ -107,3 +107,13 @@ Set `PRISM_POLICY_CACHE_TTL_SECONDS=0` to disable policy caching. When caching i
 keeps a last-known-good policy for each tenant/app pair and uses it if the configured provider
 temporarily returns no policy.
 
+Runtime policy observability is available per tenant/app:
+
+```powershell
+Invoke-RestMethod -Uri "http://127.0.0.1:8004/v1/policies/runtime/status?tenant_id=tenant_dev&app_id=pulse" -Headers $headers
+```
+
+Transform and chat audit events include `policy_source`, `policy_cache_hit`,
+`policy_cache_stale`, and `policy_provider_latency_ms` metadata so operators can distinguish fresh
+enterprise policy, cache hits, stale cache use, local policy, and fallback behavior.
+

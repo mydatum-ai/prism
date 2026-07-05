@@ -18,16 +18,36 @@ from prism_compiler.schemas import (
     TransformRequest,
     TransformResponse,
 )
-from prism_policy_runtime import DEFAULT_POLICY, Policy, resolve_policy
+from prism_policy_runtime import (
+    DEFAULT_POLICY,
+    Policy,
+    PolicyResolution,
+    resolve_policy_with_metadata,
+)
 from prism_rehydration import rehydrate
 from prism_transformers import transform
 
 
-def active_policy(tenant_id: str = "default", app_id: str = "default") -> Policy:
+def active_policy_resolution(
+    tenant_id: str = "default", app_id: str = "default"
+) -> PolicyResolution:
     try:
-        return resolve_policy(tenant_id, app_id, fallback=DEFAULT_POLICY)
+        return resolve_policy_with_metadata(tenant_id, app_id, fallback=DEFAULT_POLICY)
     except ValueError as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
+
+
+def active_policy(tenant_id: str = "default", app_id: str = "default") -> Policy:
+    return active_policy_resolution(tenant_id, app_id).policy
+
+
+def policy_audit_metadata(resolution: PolicyResolution) -> dict[str, str]:
+    return {
+        "policy_source": resolution.source,
+        "policy_cache_hit": str(resolution.cache_hit).lower(),
+        "policy_cache_stale": str(resolution.cache_stale).lower(),
+        "policy_provider_latency_ms": f"{resolution.provider_latency_ms:.3f}",
+    }
 
 
 def active_provider() -> Provider:
@@ -44,7 +64,10 @@ def active_provider() -> Provider:
 
 
 def transform_endpoint(request: TransformRequest) -> TransformResponse:
-    return transform(request, policy=active_policy(request.tenant_id, request.app_id))
+    resolution = active_policy_resolution(request.tenant_id, request.app_id)
+    response = transform(request, policy=resolution.policy)
+    response.audit_event.metadata.update(policy_audit_metadata(resolution))
+    return response
 
 
 def rehydrate_endpoint(request: RehydrateRequest) -> RehydrateResponse:
@@ -52,6 +75,7 @@ def rehydrate_endpoint(request: RehydrateRequest) -> RehydrateResponse:
 
 
 def chat_mock_endpoint(request: ChatRequest) -> ChatResponse:
+    resolution = active_policy_resolution(request.tenant_id, request.app_id)
     transformed_messages = [
         transform(
             TransformRequest(
@@ -60,7 +84,7 @@ def chat_mock_endpoint(request: ChatRequest) -> ChatResponse:
                 session_id=request.session_id,
                 text=message.content,
             ),
-            policy=active_policy(request.tenant_id, request.app_id),
+            policy=resolution.policy,
         )
         for message in request.messages
     ]
@@ -84,6 +108,9 @@ def chat_mock_endpoint(request: ChatRequest) -> ChatResponse:
             app_id=request.app_id,
             session_id=request.session_id,
             request_id=request_id,
+            policy_id=resolution.policy.policy_id,
+            policy_version=resolution.policy.version,
+            metadata=policy_audit_metadata(resolution),
         ),
     )
 
@@ -95,7 +122,7 @@ def chat_completions_endpoint(
     tenant_id = request.metadata.get("tenant_id", "default")
     app_id = request.metadata.get("app_id", "default")
     session_id = request.metadata.get("session_id", str(uuid4()))
-    policy = active_policy(tenant_id, app_id)
+    resolution = active_policy_resolution(tenant_id, app_id)
     transformed_messages = [
         ChatMessage(
             role=message.role,
@@ -106,7 +133,7 @@ def chat_completions_endpoint(
                     session_id=session_id,
                     text=message.content,
                 ),
-                policy=policy,
+                policy=resolution.policy,
             ).transformed_text,
         )
         for message in request.messages
@@ -138,5 +165,8 @@ def chat_completions_endpoint(
             app_id=app_id,
             session_id=session_id,
             request_id=rehydrated.request_id,
+            policy_id=resolution.policy.policy_id,
+            policy_version=resolution.policy.version,
+            metadata=policy_audit_metadata(resolution),
         ),
     )

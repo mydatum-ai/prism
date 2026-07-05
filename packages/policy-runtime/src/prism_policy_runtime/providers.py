@@ -2,7 +2,7 @@ import importlib
 import os
 from dataclasses import dataclass
 from time import monotonic
-from typing import Protocol, cast
+from typing import Literal, Protocol, cast
 
 from prism_policy_runtime.policy import DEFAULT_POLICY, Policy, load_policy
 
@@ -24,6 +24,19 @@ class DefaultPolicyProvider:
 class CachedPolicy:
     policy: Policy
     expires_at: float
+    source: str
+
+
+PolicySource = Literal["enterprise", "cache", "fallback", "local"]
+
+
+@dataclass(frozen=True)
+class PolicyResolution:
+    policy: Policy
+    source: PolicySource
+    cache_hit: bool
+    cache_stale: bool
+    provider_latency_ms: float
 
 
 _POLICY_CACHE: dict[tuple[str, str, str], CachedPolicy] = {}
@@ -76,25 +89,70 @@ def load_policy_provider(path: str | None = None) -> PolicyProvider:
     return cast(PolicyProvider, provider)
 
 
+def resolve_policy_with_metadata(
+    tenant_id: str,
+    app_id: str,
+    provider: PolicyProvider | None = None,
+    fallback: Policy = DEFAULT_POLICY,
+) -> PolicyResolution:
+    ttl_seconds = _cache_ttl_seconds()
+    cache_key = (_provider_cache_key(provider), tenant_id, app_id)
+    cached = _POLICY_CACHE.get(cache_key)
+    now = monotonic()
+    if ttl_seconds > 0 and cached is not None and cached.expires_at > now:
+        return PolicyResolution(
+            policy=cached.policy,
+            source="cache",
+            cache_hit=True,
+            cache_stale=False,
+            provider_latency_ms=0.0,
+        )
+
+    active_provider = provider or load_policy_provider()
+    provider_started = monotonic()
+    policy = active_provider.resolve_policy(tenant_id, app_id)
+    provider_latency_ms = (monotonic() - provider_started) * 1000
+    if policy is not None:
+        source: PolicySource = (
+            "local" if isinstance(active_provider, DefaultPolicyProvider) else "enterprise"
+        )
+        if ttl_seconds > 0:
+            _POLICY_CACHE[cache_key] = CachedPolicy(
+                policy=policy, expires_at=now + ttl_seconds, source=source
+            )
+        return PolicyResolution(
+            policy=policy,
+            source=source,
+            cache_hit=False,
+            cache_stale=False,
+            provider_latency_ms=provider_latency_ms,
+        )
+    if cached is not None:
+        return PolicyResolution(
+            policy=cached.policy,
+            source="cache",
+            cache_hit=True,
+            cache_stale=True,
+            provider_latency_ms=provider_latency_ms,
+        )
+    return PolicyResolution(
+        policy=fallback,
+        source="fallback",
+        cache_hit=False,
+        cache_stale=False,
+        provider_latency_ms=provider_latency_ms,
+    )
+
+
 def resolve_policy(
     tenant_id: str,
     app_id: str,
     provider: PolicyProvider | None = None,
     fallback: Policy = DEFAULT_POLICY,
 ) -> Policy:
-    ttl_seconds = _cache_ttl_seconds()
-    cache_key = (_provider_cache_key(provider), tenant_id, app_id)
-    cached = _POLICY_CACHE.get(cache_key)
-    now = monotonic()
-    if ttl_seconds > 0 and cached is not None and cached.expires_at > now:
-        return cached.policy
-
-    active_provider = provider or load_policy_provider()
-    policy = active_provider.resolve_policy(tenant_id, app_id)
-    if policy is not None:
-        if ttl_seconds > 0:
-            _POLICY_CACHE[cache_key] = CachedPolicy(policy=policy, expires_at=now + ttl_seconds)
-        return policy
-    if cached is not None:
-        return cached.policy
-    return fallback
+    return resolve_policy_with_metadata(
+        tenant_id,
+        app_id,
+        provider=provider,
+        fallback=fallback,
+    ).policy

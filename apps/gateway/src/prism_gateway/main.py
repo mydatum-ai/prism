@@ -12,6 +12,7 @@ from prism_compiler.schemas import (
     PolicyCacheInvalidateResponse,
     RehydrateRequest,
     RehydrateResponse,
+    RuntimePolicyStatusResponse,
     TransformRequest,
     TransformResponse,
 )
@@ -29,6 +30,7 @@ from prism_gateway.auth import (
     setting,
 )
 from prism_gateway.routes import (
+    active_policy_resolution,
     chat_completions_endpoint,
     chat_mock_endpoint,
     rehydrate_endpoint,
@@ -145,3 +147,23 @@ def invalidate_policy_cache_route(
         require_tenant(principal, request.tenant_id)
     removed = clear_policy_cache(tenant_id=request.tenant_id, app_id=request.app_id)
     return PolicyCacheInvalidateResponse(removed=removed)
+
+
+@app.get("/v1/policies/runtime/status", response_model=RuntimePolicyStatusResponse)
+def runtime_policy_status_route(
+    tenant_id: str,
+    app_id: str,
+    principal: Annotated[Principal, Depends(authenticate)],
+) -> RuntimePolicyStatusResponse:
+    require_tenant(principal, tenant_id)
+    resolution = active_policy_resolution(tenant_id, app_id)
+    return RuntimePolicyStatusResponse(
+        tenant_id=tenant_id,
+        app_id=app_id,
+        policy_id=resolution.policy.policy_id,
+        policy_version=resolution.policy.version,
+        policy_source=resolution.source,
+        policy_cache_hit=resolution.cache_hit,
+        policy_cache_stale=resolution.cache_stale,
+        policy_provider_latency_ms=resolution.provider_latency_ms,
+    )

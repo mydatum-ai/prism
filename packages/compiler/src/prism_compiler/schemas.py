@@ -18,6 +18,17 @@ class PolicyCacheInvalidateResponse(BaseModel):
     removed: int
 
 
+class RuntimePolicyStatusResponse(BaseModel):
+    tenant_id: str
+    app_id: str
+    policy_id: str
+    policy_version: str
+    policy_source: Literal["enterprise", "cache", "fallback", "local"]
+    policy_cache_hit: bool
+    policy_cache_stale: bool
+    policy_provider_latency_ms: float
+
+
 class EntityDetection(BaseModel):
     text: str
     entity_type: str

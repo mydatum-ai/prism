@@ -8,6 +8,7 @@ from prism_policy_runtime import (
     load_policy,
     load_policy_provider,
     resolve_policy,
+    resolve_policy_with_metadata,
 )
 from pytest import MonkeyPatch
 
@@ -28,6 +29,51 @@ def test_phase_p16_policy_cache_reuses_provider_result(monkeypatch: MonkeyPatch)
     assert first.rules[0].token_prefix == "FIRST"
     assert second.rules[0].token_prefix == "FIRST"
     assert provider.calls == 1
+
+
+def test_phase_p17_policy_resolution_reports_enterprise_source(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    clear_policy_cache()
+    monkeypatch.setenv("PRISM_POLICY_CACHE_TTL_SECONDS", "60")
+    provider = SequencePolicyProvider([policy_with_prefix("tenant_dev", "pulse", "FIRST")])
+
+    resolution = resolve_policy_with_metadata("tenant_dev", "pulse", provider=provider)
+
+    assert resolution.source == "enterprise"
+    assert resolution.cache_hit is False
+    assert resolution.cache_stale is False
+    assert resolution.provider_latency_ms >= 0
+
+
+def test_phase_p17_policy_resolution_reports_cache_hit(monkeypatch: MonkeyPatch) -> None:
+    clear_policy_cache()
+    monkeypatch.setenv("PRISM_POLICY_CACHE_TTL_SECONDS", "60")
+    provider = SequencePolicyProvider([policy_with_prefix("tenant_dev", "pulse", "FIRST")])
+
+    resolve_policy_with_metadata("tenant_dev", "pulse", provider=provider)
+    cached = resolve_policy_with_metadata("tenant_dev", "pulse", provider=provider)
+
+    assert cached.source == "cache"
+    assert cached.cache_hit is True
+    assert cached.cache_stale is False
+    assert cached.provider_latency_ms == 0
+
+
+def test_phase_p17_policy_resolution_reports_fallback(monkeypatch: MonkeyPatch) -> None:
+    clear_policy_cache()
+    monkeypatch.setenv("PRISM_POLICY_CACHE_TTL_SECONDS", "60")
+
+    resolution = resolve_policy_with_metadata(
+        "tenant_dev",
+        "pulse",
+        provider=SequencePolicyProvider([None]),
+    )
+
+    assert resolution.policy == DEFAULT_POLICY
+    assert resolution.source == "fallback"
+    assert resolution.cache_hit is False
+    assert resolution.cache_stale is False
 
 
 def test_phase_p16_policy_cache_expires(monkeypatch: MonkeyPatch) -> None:
@@ -76,9 +122,12 @@ def test_phase_p16_policy_cache_keeps_last_known_good(monkeypatch: MonkeyPatch) 
     )
     current_time = 111.0
 
-    assert (
-        resolve_policy("tenant_dev", "pulse", provider=provider).rules[0].token_prefix == "CACHED"
-    )
+    resolution = resolve_policy_with_metadata("tenant_dev", "pulse", provider=provider)
+
+    assert resolution.policy.rules[0].token_prefix == "CACHED"
+    assert resolution.source == "cache"
+    assert resolution.cache_hit is True
+    assert resolution.cache_stale is True
     assert provider.calls == 2
 
 
