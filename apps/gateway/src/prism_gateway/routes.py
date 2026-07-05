@@ -18,16 +18,16 @@ from prism_compiler.schemas import (
     TransformRequest,
     TransformResponse,
 )
-from prism_policy_runtime import DEFAULT_POLICY, Policy, load_policy
+from prism_policy_runtime import DEFAULT_POLICY, Policy, resolve_policy
 from prism_rehydration import rehydrate
 from prism_transformers import transform
 
 
-def active_policy() -> Policy:
-    policy_path = os.getenv("PRISM_POLICY_PATH")
-    if not policy_path:
-        return DEFAULT_POLICY
-    return load_policy(policy_path)
+def active_policy(tenant_id: str = "default", app_id: str = "default") -> Policy:
+    try:
+        return resolve_policy(tenant_id, app_id, fallback=DEFAULT_POLICY)
+    except ValueError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
 
 
 def active_provider() -> Provider:
@@ -44,7 +44,7 @@ def active_provider() -> Provider:
 
 
 def transform_endpoint(request: TransformRequest) -> TransformResponse:
-    return transform(request, policy=active_policy())
+    return transform(request, policy=active_policy(request.tenant_id, request.app_id))
 
 
 def rehydrate_endpoint(request: RehydrateRequest) -> RehydrateResponse:
@@ -60,7 +60,7 @@ def chat_mock_endpoint(request: ChatRequest) -> ChatResponse:
                 session_id=request.session_id,
                 text=message.content,
             ),
-            policy=active_policy(),
+            policy=active_policy(request.tenant_id, request.app_id),
         )
         for message in request.messages
     ]
@@ -95,7 +95,7 @@ def chat_completions_endpoint(
     tenant_id = request.metadata.get("tenant_id", "default")
     app_id = request.metadata.get("app_id", "default")
     session_id = request.metadata.get("session_id", str(uuid4()))
-    policy = active_policy()
+    policy = active_policy(tenant_id, app_id)
     transformed_messages = [
         ChatMessage(
             role=message.role,

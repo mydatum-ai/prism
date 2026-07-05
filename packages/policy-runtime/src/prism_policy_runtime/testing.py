@@ -10,3 +10,8 @@ class StaticPolicyProvider:
                 "rules": [{"entity_type": "person", "action": "tokenize", "token_prefix": "TEST"}],
             }
         )
+
+
+class NullPolicyProvider:
+    def resolve_policy(self, tenant_id: str, app_id: str) -> Policy | None:
+        return None
