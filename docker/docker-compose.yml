@@ -1,3 +1,5 @@
+name: prism
+
 services:
   gateway:
     profiles: ["dev", "staging", "prod"]
@@ -36,8 +38,8 @@ services:
   redis:
     profiles: ["dev", "staging", "prod"]
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    expose:
+      - "6379"
 
 volumes:
   prism-audit:
