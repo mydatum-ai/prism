@@ -149,7 +149,29 @@ mypy .
 pytest -q
 ```
 
+### Phase 6: Enterprise Plugin Loading
+
+Status: completed for public repo contracts and loader
+
+Implemented:
+
+- Public enterprise extension contracts: `SemanticAnalyzer`, `SemanticGraphBuilder`, `TransformationOptimizer`, `DomainPack`, `EnterpriseVault`, and `AdvancedEvaluator`.
+- Shared semantic analysis and semantic graph models.
+- Import-string plugin loader.
+- Optional `PRISM_SEMANTIC_ANALYZER` loading.
+- `PRISM_DOMAIN_PACKS` parsing.
+- Community fallback behavior when enterprise plugins are absent.
+- Runtime guard test ensuring `prism` does not directly import `prism-enterprise`.
+
+Verified:
+
+```powershell
+ruff format --check .
+ruff check .
+mypy .
+pytest -q
+```
+
 ## Pending
 
-- Phase 6: Enterprise Plugin Loading
 - Phases 7-12: Enterprise-driven compatibility work
