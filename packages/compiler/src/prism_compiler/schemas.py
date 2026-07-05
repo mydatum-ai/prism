@@ -9,6 +9,15 @@ class HealthResponse(BaseModel):
     service: str
 
 
+class PolicyCacheInvalidateRequest(BaseModel):
+    tenant_id: str | None = None
+    app_id: str | None = None
+
+
+class PolicyCacheInvalidateResponse(BaseModel):
+    removed: int
+
+
 class EntityDetection(BaseModel):
     text: str
     entity_type: str

@@ -8,11 +8,14 @@ from prism_compiler.schemas import (
     HealthResponse,
     OpenAIChatCompletionRequest,
     OpenAIChatCompletionResponse,
+    PolicyCacheInvalidateRequest,
+    PolicyCacheInvalidateResponse,
     RehydrateRequest,
     RehydrateResponse,
     TransformRequest,
     TransformResponse,
 )
+from prism_policy_runtime import clear_policy_cache
 from starlette.middleware.sessions import SessionMiddleware
 
 from prism_gateway.auth import (
@@ -131,3 +134,14 @@ def audit_route(
 ) -> dict[str, object]:
     require_tenant(principal, tenant_id)
     return {"tenant_id": tenant_id, "events": active_audit_store().list_for_tenant(tenant_id)}
+
+
+@app.post("/v1/policies/cache/invalidate", response_model=PolicyCacheInvalidateResponse)
+def invalidate_policy_cache_route(
+    request: PolicyCacheInvalidateRequest,
+    principal: Annotated[Principal, Depends(authenticate)],
+) -> PolicyCacheInvalidateResponse:
+    if request.tenant_id is not None:
+        require_tenant(principal, request.tenant_id)
+    removed = clear_policy_cache(tenant_id=request.tenant_id, app_id=request.app_id)
+    return PolicyCacheInvalidateResponse(removed=removed)
