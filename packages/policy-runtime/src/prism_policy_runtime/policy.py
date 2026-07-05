@@ -15,6 +15,7 @@ PolicyAction = Literal[
     "abstract",
     "block",
 ]
+TokenStrategy = Literal["sequence", "session_stable", "tenant_stable", "random_opaque"]
 
 
 class PolicyRule(BaseModel):
@@ -29,6 +30,7 @@ class PolicyRule(BaseModel):
     environment: str | None = None
     min_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     token_prefix: str | None = None
+    token_strategy: TokenStrategy = "sequence"
     replacement: str | None = None
 
 
@@ -45,6 +47,7 @@ class Policy(BaseModel):
 class PolicyDecision(BaseModel):
     action: PolicyAction
     token_prefix: str | None = None
+    token_strategy: TokenStrategy = "sequence"
     replacement: str | None = None
     policy_id: str
     policy_version: str
@@ -92,6 +95,7 @@ def decide(
         return PolicyDecision(
             action=rule.action,
             token_prefix=rule.token_prefix,
+            token_strategy=rule.token_strategy,
             replacement=rule.replacement,
             policy_id=policy.policy_id,
             policy_version=policy.version,
@@ -101,6 +105,7 @@ def decide(
     return PolicyDecision(
         action="tokenize",
         token_prefix=detection.entity_type.upper(),
+        token_strategy="sequence",
         policy_id=policy.policy_id,
         policy_version=policy.version,
         reason="default_tokenize",

@@ -4,7 +4,7 @@ from uuid import uuid4
 from prism_compiler.schemas import AuditEvent, RehydrateRequest, RehydrateResponse
 from prism_vault_core import GLOBAL_VAULT, InMemoryVault, VaultKey
 
-TOKEN_PATTERN = re.compile(r"\b[A-Z][A-Z_]*_\d+\b")
+TOKEN_PATTERN = re.compile(r"\b[A-Z][A-Z0-9_]*_[A-Z0-9]+\b")
 
 
 def rehydrate(request: RehydrateRequest, vault: InMemoryVault = GLOBAL_VAULT) -> RehydrateResponse:

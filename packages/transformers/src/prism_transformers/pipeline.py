@@ -1,5 +1,6 @@
 from collections import Counter
 from collections.abc import Iterable
+from hashlib import sha256
 from typing import Protocol
 from uuid import uuid4
 
@@ -78,7 +79,12 @@ def transform(
             ),
         )
         counters[detection.entity_type] += 1
-        replacement = _replacement_for(detection, counters[detection.entity_type], decision)
+        replacement = _replacement_for(
+            detection,
+            counters[detection.entity_type],
+            decision,
+            request=request,
+        )
         transformed_parts.append(replacement)
         cursor = detection.end
         token_start = transformed_cursor
@@ -86,10 +92,15 @@ def transform(
 
         if decision.action == "tokenize":
             metadata = {
+                "tenant_id": request.tenant_id,
+                "app_id": request.app_id,
+                "session_id": request.session_id,
                 "request_id": request_id,
                 "policy_id": decision.policy_id,
                 "policy_version": decision.policy_version,
+                "entity_type": detection.entity_type,
                 "decision_reason": decision.reason,
+                "token_strategy": decision.token_strategy,
             }
             if decision.rule_id is not None:
                 metadata["rule_id"] = decision.rule_id
@@ -153,7 +164,13 @@ def _token_for(entity_type: str, index: int) -> str:
     return f"{prefix}_{index}"
 
 
-def _replacement_for(detection: EntityDetection, index: int, decision: PolicyDecision) -> str:
+def _replacement_for(
+    detection: EntityDetection,
+    index: int,
+    decision: PolicyDecision,
+    *,
+    request: TransformRequest,
+) -> str:
     action = decision.action
     if action == "preserve":
         return detection.text
@@ -161,6 +178,24 @@ def _replacement_for(detection: EntityDetection, index: int, decision: PolicyDec
         prefix = decision.token_prefix or TOKEN_PREFIXES.get(
             detection.entity_type, detection.entity_type.upper()
         )
+        if decision.token_strategy == "session_stable":
+            digest = _stable_digest(
+                request.tenant_id,
+                request.app_id,
+                request.session_id,
+                detection.entity_type,
+                detection.text,
+            )
+            return f"{prefix}_{digest}"
+        if decision.token_strategy == "tenant_stable":
+            digest = _stable_digest(
+                request.tenant_id,
+                detection.entity_type,
+                detection.text,
+            )
+            return f"{prefix}_{digest}"
+        if decision.token_strategy == "random_opaque":
+            return f"{prefix}_{uuid4().hex[:12].upper()}"
         return f"{prefix}_{index}"
     if action == "mask":
         return decision.replacement or f"[MASKED_{detection.entity_type.upper()}]"
@@ -175,6 +210,11 @@ def _replacement_for(detection: EntityDetection, index: int, decision: PolicyDec
     if action == "block":
         return decision.replacement or "[BLOCKED]"
     return _token_for(detection.entity_type, index)
+
+
+def _stable_digest(*parts: str) -> str:
+    normalized = "\x1f".join(parts)
+    return sha256(normalized.encode("utf-8")).hexdigest()[:12].upper()
 
 
 def _remove_overlaps(detections: list[EntityDetection]) -> list[EntityDetection]:

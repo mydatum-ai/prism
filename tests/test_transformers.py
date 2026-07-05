@@ -130,3 +130,141 @@ def test_p16_transform_uses_request_context_for_policy_conditions() -> None:
 
     assert response.transformed_text == "[REDACTED_EMAIL]"
     assert response.decisions[0].rule_id == "prod_outbound_email"
+
+
+def test_p16_session_stable_tokens_repeat_within_session_only() -> None:
+    policy = Policy.model_validate(
+        {
+            "domain": "tokens",
+            "rules": [
+                {
+                    "entity_type": "email",
+                    "action": "tokenize",
+                    "token_prefix": "EMAIL",
+                    "token_strategy": "session_stable",
+                }
+            ],
+        }
+    )
+    request = TransformRequest(
+        tenant_id="tenant_a",
+        app_id="pulse",
+        session_id="session_1",
+        text="maria@example.com",
+    )
+
+    first = transform(request, vault=InMemoryVault(), policy=policy)
+    second = transform(request, vault=InMemoryVault(), policy=policy)
+    other_session = transform(
+        request.model_copy(update={"session_id": "session_2"}),
+        vault=InMemoryVault(),
+        policy=policy,
+    )
+
+    assert first.transformed_text == second.transformed_text
+    assert first.transformed_text != other_session.transformed_text
+    assert first.mappings[0].metadata["token_strategy"] == "session_stable"
+
+
+def test_p16_tenant_stable_tokens_ignore_app_and_session_scope() -> None:
+    policy = Policy.model_validate(
+        {
+            "domain": "tokens",
+            "rules": [
+                {
+                    "entity_type": "email",
+                    "action": "tokenize",
+                    "token_prefix": "EMAIL",
+                    "token_strategy": "tenant_stable",
+                }
+            ],
+        }
+    )
+    request = TransformRequest(
+        tenant_id="tenant_a",
+        app_id="pulse",
+        session_id="session_1",
+        text="maria@example.com",
+    )
+
+    first = transform(request, vault=InMemoryVault(), policy=policy)
+    other_app = transform(
+        request.model_copy(update={"app_id": "other", "session_id": "session_2"}),
+        vault=InMemoryVault(),
+        policy=policy,
+    )
+    other_tenant = transform(
+        request.model_copy(update={"tenant_id": "tenant_b"}),
+        vault=InMemoryVault(),
+        policy=policy,
+    )
+
+    assert first.transformed_text == other_app.transformed_text
+    assert first.transformed_text != other_tenant.transformed_text
+
+
+def test_p16_random_opaque_tokens_do_not_repeat() -> None:
+    policy = Policy.model_validate(
+        {
+            "domain": "tokens",
+            "rules": [
+                {
+                    "entity_type": "email",
+                    "action": "tokenize",
+                    "token_prefix": "EMAIL",
+                    "token_strategy": "random_opaque",
+                }
+            ],
+        }
+    )
+    request = TransformRequest(
+        tenant_id="tenant_a",
+        app_id="pulse",
+        session_id="session_1",
+        text="maria@example.com",
+    )
+
+    first = transform(request, vault=InMemoryVault(), policy=policy)
+    second = transform(request, vault=InMemoryVault(), policy=policy)
+
+    assert first.transformed_text.startswith("EMAIL_")
+    assert second.transformed_text.startswith("EMAIL_")
+    assert first.transformed_text != second.transformed_text
+
+
+def test_p16_mapping_metadata_contains_scope_policy_and_decision_fields() -> None:
+    policy = Policy.model_validate(
+        {
+            "domain": "tokens",
+            "version": "9",
+            "rules": [
+                {
+                    "rule_id": "email_token",
+                    "entity_type": "email",
+                    "action": "tokenize",
+                    "token_prefix": "EMAIL",
+                }
+            ],
+        }
+    )
+
+    response = transform(
+        TransformRequest(
+            tenant_id="tenant_a",
+            app_id="pulse",
+            session_id="session_1",
+            text="maria@example.com",
+        ),
+        vault=InMemoryVault(),
+        policy=policy,
+    )
+
+    metadata = response.mappings[0].metadata
+    assert metadata["tenant_id"] == "tenant_a"
+    assert metadata["app_id"] == "pulse"
+    assert metadata["session_id"] == "session_1"
+    assert metadata["policy_id"] == "tokens"
+    assert metadata["policy_version"] == "9"
+    assert metadata["rule_id"] == "email_token"
+    assert metadata["decision_reason"] == "rule_matched"
+    assert metadata["token_strategy"] == "sequence"
