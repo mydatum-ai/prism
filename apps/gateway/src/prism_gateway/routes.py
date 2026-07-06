@@ -15,6 +15,7 @@ from prism_compiler.schemas import (
     OpenAIChatCompletionResponse,
     RehydrateRequest,
     RehydrateResponse,
+    RuntimePolicyStatusResponse,
     TransformRequest,
     TransformResponse,
 )
@@ -39,6 +40,29 @@ def active_policy_resolution(
 
 def active_policy(tenant_id: str = "default", app_id: str = "default") -> Policy:
     return active_policy_resolution(tenant_id, app_id).policy
+
+
+def runtime_policy_status(
+    tenant_id: str,
+    app_id: str,
+) -> RuntimePolicyStatusResponse:
+    resolution = active_policy_resolution(tenant_id, app_id)
+    diagnostics: list[str] = []
+    if resolution.source == "fallback":
+        diagnostics.append("using_fallback_policy")
+    if resolution.cache_stale:
+        diagnostics.append("using_stale_cached_policy")
+    return RuntimePolicyStatusResponse(
+        tenant_id=tenant_id,
+        app_id=app_id,
+        policy_id=resolution.policy.policy_id,
+        policy_version=resolution.policy.version,
+        policy_source=resolution.source,
+        policy_cache_hit=resolution.cache_hit,
+        policy_cache_stale=resolution.cache_stale,
+        policy_provider_latency_ms=resolution.provider_latency_ms,
+        diagnostics=diagnostics,
+    )
 
 
 def policy_audit_metadata(resolution: PolicyResolution) -> dict[str, str]:

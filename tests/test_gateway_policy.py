@@ -100,3 +100,19 @@ def test_phase_p17_runtime_status_reports_policy_source(monkeypatch: MonkeyPatch
     assert second.status_code == 200
     assert second.json()["policy_source"] == "cache"
     assert second.json()["policy_cache_hit"] is True
+
+
+def test_runtime_diagnostics_reports_fallback_warning(monkeypatch: MonkeyPatch) -> None:
+    clear_policy_cache()
+    monkeypatch.delenv("PRISM_POLICY_PATH", raising=False)
+    monkeypatch.setenv("PRISM_POLICY_PROVIDER", "prism_policy_runtime.testing:NullPolicyProvider")
+    client = TestClient(app)
+
+    response = client.get(
+        "/v1/policies/runtime/diagnostics",
+        params={"tenant_id": "tenant_dev", "app_id": "pulse"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["policy_source"] == "fallback"
+    assert response.json()["diagnostics"] == ["using_fallback_policy"]

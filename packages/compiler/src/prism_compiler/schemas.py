@@ -27,6 +27,7 @@ class RuntimePolicyStatusResponse(BaseModel):
     policy_cache_hit: bool
     policy_cache_stale: bool
     policy_provider_latency_ms: float
+    diagnostics: list[str] = Field(default_factory=list)
 
 
 class EntityDetection(BaseModel):
