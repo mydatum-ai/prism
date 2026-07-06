@@ -1,4 +1,5 @@
 import re
+from datetime import UTC, datetime
 from typing import Literal
 from uuid import uuid4
 
@@ -48,15 +49,26 @@ def rehydrate(
             ):
                 status = "wrong_scope"
                 reason = "token_found_outside_requested_scope"
-            diagnostics.append(RehydrationDiagnostic(token=token, status=status, reason=reason))
+            diagnostics.append(
+                _diagnostic(
+                    request,
+                    policy,
+                    token=token,
+                    status=status,
+                    reason=reason,
+                )
+            )
             return token
         if record.expired:
             diagnostics.append(
-                RehydrationDiagnostic(
+                _diagnostic(
+                    request,
+                    policy,
                     token=token,
                     entity_type=record.entity_type,
                     status="expired",
                     reason="mapping_expired",
+                    token_age_seconds=_token_age_seconds(record.created_at),
                 )
             )
             return token
@@ -65,11 +77,14 @@ def rehydrate(
             and record.entity_type not in request.allowed_entity_types
         ):
             diagnostics.append(
-                RehydrationDiagnostic(
+                _diagnostic(
+                    request,
+                    policy,
                     token=token,
                     entity_type=record.entity_type,
                     status="denied",
                     reason="entity_type_not_allowed",
+                    token_age_seconds=_token_age_seconds(record.created_at),
                 )
             )
             return token
@@ -87,20 +102,28 @@ def rehydrate(
         )
         if not decision.allowed:
             diagnostics.append(
-                RehydrationDiagnostic(
+                _diagnostic(
+                    request,
+                    policy,
                     token=token,
                     entity_type=record.entity_type,
                     status="policy_blocked",
                     reason=decision.reason,
+                    decision=decision,
+                    token_age_seconds=_token_age_seconds(record.created_at),
                 )
             )
             return token
         diagnostics.append(
-            RehydrationDiagnostic(
+            _diagnostic(
+                request,
+                policy,
                 token=token,
                 entity_type=record.entity_type,
                 status="allowed",
                 reason=decision.reason,
+                decision=decision,
+                token_age_seconds=_token_age_seconds(record.created_at),
             )
         )
         return record.value
@@ -111,6 +134,20 @@ def rehydrate(
         app_id=request.app_id,
         session_id=request.session_id,
         request_id=request_id,
+        policy_id=policy.policy_id,
+        policy_version=policy.version,
+        metadata={
+            "policy_source": request.policy_source or "unknown",
+            "policy_cache_hit": str(request.policy_cache_hit).lower()
+            if request.policy_cache_hit is not None
+            else "unknown",
+            "policy_cache_stale": str(request.policy_cache_stale).lower()
+            if request.policy_cache_stale is not None
+            else "unknown",
+            "policy_provider_latency_ms": f"{request.policy_provider_latency_ms:.3f}"
+            if request.policy_provider_latency_ms is not None
+            else "unknown",
+        },
     )
     text = TOKEN_PATTERN.sub(replace, request.text)
     audit_event.metadata.update(
@@ -147,6 +184,7 @@ def _transaction_event_for_rehydrate(
         environment=request.environment,
         policy_id=policy.policy_id,
         policy_version=policy.version,
+        policy_source=request.policy_source or "unknown",
         input_fingerprint=fingerprint_text(request.text),
         requested_text_preview=request.text,
         rehydrated_preview=response.text,
@@ -159,6 +197,18 @@ def _transaction_event_for_rehydrate(
                 allowed=item.status == "allowed",
                 reason=item.reason,
                 status=item.status,
+                policy_id=item.policy_id,
+                policy_version=item.policy_version,
+                policy_source=item.policy_source,
+                rule_id=item.rule_id,
+                requester_roles=item.requester_roles,
+                required_roles=item.required_roles,
+                purpose=item.purpose,
+                direction=item.direction,
+                environment=item.environment,
+                token_age_seconds=item.token_age_seconds,
+                max_token_age_seconds=item.max_token_age_seconds,
+                matched_constraints=item.matched_constraints,
             )
             for item in response.diagnostics
         ],
@@ -170,3 +220,45 @@ def _transaction_event_for_rehydrate(
             or ["rehydration completed without blocked tokens"],
         ),
     )
+
+
+def _diagnostic(
+    request: RehydrateRequest,
+    policy: Policy,
+    *,
+    token: str,
+    status: Literal[
+        "allowed",
+        "denied",
+        "expired",
+        "missing_mapping",
+        "wrong_scope",
+        "policy_blocked",
+    ],
+    reason: str,
+    entity_type: str | None = None,
+    decision: object | None = None,
+    token_age_seconds: float | None = None,
+) -> RehydrationDiagnostic:
+    return RehydrationDiagnostic(
+        token=token,
+        entity_type=entity_type,
+        status=status,
+        reason=reason,
+        policy_id=policy.policy_id,
+        policy_version=policy.version,
+        policy_source=request.policy_source or "unknown",
+        rule_id=getattr(decision, "rule_id", None),
+        requester_roles=request.roles,
+        required_roles=list(getattr(decision, "required_roles", []) or []),
+        purpose=request.purpose or getattr(decision, "purpose", None),
+        direction=request.direction,
+        environment=request.environment or getattr(decision, "environment", None),
+        token_age_seconds=token_age_seconds,
+        max_token_age_seconds=getattr(decision, "max_token_age_seconds", None),
+        matched_constraints=dict(getattr(decision, "matched_constraints", {}) or {}),
+    )
+
+
+def _token_age_seconds(created_at: datetime) -> float:
+    return max((datetime.now(UTC) - created_at).total_seconds(), 0.0)

@@ -44,9 +44,17 @@ class PolicyDecisionSummary(BaseModel):
     action: str
     policy_id: str
     policy_version: str
+    policy_source: PolicySource = "unknown"
     rule_id: str | None = None
     reason: str
     token: str | None = None
+    token_strategy: str | None = None
+    app_id: str | None = None
+    role: str | None = None
+    purpose: str | None = None
+    direction: str | None = None
+    environment: str | None = None
+    matched_constraints: dict[str, str] = Field(default_factory=dict)
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
 
 
@@ -56,6 +64,18 @@ class RehydrationDecisionSummary(BaseModel):
     allowed: bool
     reason: str
     status: str
+    policy_id: str | None = None
+    policy_version: str | None = None
+    policy_source: PolicySource = "unknown"
+    rule_id: str | None = None
+    requester_roles: list[str] = Field(default_factory=list)
+    required_roles: list[str] = Field(default_factory=list)
+    purpose: str | None = None
+    direction: str | None = None
+    environment: str | None = None
+    token_age_seconds: float | None = None
+    max_token_age_seconds: int | None = None
+    matched_constraints: dict[str, str] = Field(default_factory=dict)
 
 
 class BaseTransactionEvent(BaseModel):

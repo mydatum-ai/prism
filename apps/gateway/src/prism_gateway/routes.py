@@ -74,6 +74,20 @@ def policy_audit_metadata(resolution: PolicyResolution) -> dict[str, str]:
     }
 
 
+def request_with_policy_metadata(
+    request: TransformRequest | RehydrateRequest,
+    resolution: PolicyResolution,
+) -> TransformRequest | RehydrateRequest:
+    return request.model_copy(
+        update={
+            "policy_source": resolution.source,
+            "policy_cache_hit": resolution.cache_hit,
+            "policy_cache_stale": resolution.cache_stale,
+            "policy_provider_latency_ms": resolution.provider_latency_ms,
+        }
+    )
+
+
 def active_provider() -> Provider:
     provider_name = os.getenv("PRISM_PROVIDER", "mock").lower()
     if provider_name == "mock":
@@ -89,14 +103,18 @@ def active_provider() -> Provider:
 
 def transform_endpoint(request: TransformRequest) -> TransformResponse:
     resolution = active_policy_resolution(request.tenant_id, request.app_id)
-    response = transform(request, policy=resolution.policy)
+    enriched_request = request_with_policy_metadata(request, resolution)
+    assert isinstance(enriched_request, TransformRequest)
+    response = transform(enriched_request, policy=resolution.policy)
     response.audit_event.metadata.update(policy_audit_metadata(resolution))
     return response
 
 
 def rehydrate_endpoint(request: RehydrateRequest) -> RehydrateResponse:
     resolution = active_policy_resolution(request.tenant_id, request.app_id)
-    response = rehydrate(request, policy=resolution.policy)
+    enriched_request = request_with_policy_metadata(request, resolution)
+    assert isinstance(enriched_request, RehydrateRequest)
+    response = rehydrate(enriched_request, policy=resolution.policy)
     response.audit_event.metadata.update(policy_audit_metadata(resolution))
     return response
 
@@ -110,6 +128,10 @@ def chat_mock_endpoint(request: ChatRequest) -> ChatResponse:
                 app_id=request.app_id,
                 session_id=request.session_id,
                 text=message.content,
+                policy_source=resolution.source,
+                policy_cache_hit=resolution.cache_hit,
+                policy_cache_stale=resolution.cache_stale,
+                policy_provider_latency_ms=resolution.provider_latency_ms,
             ),
             policy=resolution.policy,
         )
@@ -123,6 +145,10 @@ def chat_mock_endpoint(request: ChatRequest) -> ChatResponse:
             app_id=request.app_id,
             session_id=request.session_id,
             text=provider_text,
+            policy_source=resolution.source,
+            policy_cache_hit=resolution.cache_hit,
+            policy_cache_stale=resolution.cache_stale,
+            policy_provider_latency_ms=resolution.provider_latency_ms,
         ),
         policy=resolution.policy,
     )
@@ -160,6 +186,10 @@ def chat_completions_endpoint(
                     app_id=app_id,
                     session_id=session_id,
                     text=message.content,
+                    policy_source=resolution.source,
+                    policy_cache_hit=resolution.cache_hit,
+                    policy_cache_stale=resolution.cache_stale,
+                    policy_provider_latency_ms=resolution.provider_latency_ms,
                 ),
                 policy=resolution.policy,
             ).transformed_text,
@@ -175,6 +205,10 @@ def chat_completions_endpoint(
             app_id=app_id,
             session_id=session_id,
             text=provider_response.content,
+            policy_source=resolution.source,
+            policy_cache_hit=resolution.cache_hit,
+            policy_cache_stale=resolution.cache_stale,
+            policy_provider_latency_ms=resolution.provider_latency_ms,
         ),
         policy=resolution.policy,
     )

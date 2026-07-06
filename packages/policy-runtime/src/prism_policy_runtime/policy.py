@@ -59,6 +59,13 @@ class PolicyDecision(BaseModel):
     policy_version: str
     rule_id: str | None = None
     reason: str
+    role: str | None = None
+    purpose: str | None = None
+    direction: str | None = None
+    app_id: str | None = None
+    environment: str | None = None
+    min_confidence: float | None = None
+    matched_constraints: dict[str, str] = Field(default_factory=dict)
 
 
 class PolicyDecisionContext(BaseModel):
@@ -80,6 +87,12 @@ class RehydrationPolicyDecision(BaseModel):
     allowed: bool
     reason: str
     rule_id: str | None = None
+    required_roles: list[str] = Field(default_factory=list)
+    purpose: str | None = None
+    app_id: str | None = None
+    environment: str | None = None
+    max_token_age_seconds: int | None = None
+    matched_constraints: dict[str, str] = Field(default_factory=dict)
 
 
 DEFAULT_POLICY = Policy(
@@ -121,6 +134,13 @@ def decide(
             policy_version=policy.version,
             rule_id=rule.rule_id,
             reason="conflict_resolved" if len(matched_rules) > 1 else "rule_matched",
+            role=rule.role,
+            purpose=rule.purpose,
+            direction=rule.direction,
+            app_id=rule.app_id,
+            environment=rule.environment,
+            min_confidence=rule.min_confidence,
+            matched_constraints=_transformation_constraints(rule),
         )
     return PolicyDecision(
         action="tokenize",
@@ -172,6 +192,38 @@ def _specificity(rule: PolicyRule) -> int:
     )
 
 
+def _transformation_constraints(rule: PolicyRule) -> dict[str, str]:
+    constraints: dict[str, str] = {}
+    for key, value in (
+        ("role", rule.role),
+        ("purpose", rule.purpose),
+        ("direction", rule.direction),
+        ("app_id", rule.app_id),
+        ("environment", rule.environment),
+    ):
+        if value is not None:
+            constraints[key] = value
+    if rule.min_confidence is not None:
+        constraints["min_confidence"] = str(rule.min_confidence)
+    return constraints
+
+
+def _rehydration_constraints(rule: PolicyRule) -> dict[str, str]:
+    constraints: dict[str, str] = {}
+    if rule.rehydrate_roles is not None:
+        constraints["roles"] = ",".join(rule.rehydrate_roles)
+    for key, value in (
+        ("purpose", rule.rehydrate_purpose),
+        ("app_id", rule.rehydrate_app_id),
+        ("environment", rule.rehydrate_environment),
+    ):
+        if value is not None:
+            constraints[key] = value
+    if rule.max_token_age_seconds is not None:
+        constraints["max_token_age_seconds"] = str(rule.max_token_age_seconds)
+    return constraints
+
+
 def decide_rehydration(
     policy: Policy,
     *,
@@ -187,6 +239,7 @@ def decide_rehydration(
     if not matched_rules:
         return RehydrationPolicyDecision(allowed=True, reason="no_rehydration_restriction")
     _, rule = sorted(matched_rules, key=_rule_sort_key)[0]
+    constraints = _rehydration_constraints(rule)
     if rule.max_token_age_seconds is not None:
         age_seconds = (datetime.now(UTC) - created_at).total_seconds()
         if age_seconds > rule.max_token_age_seconds:
@@ -194,6 +247,12 @@ def decide_rehydration(
                 allowed=False,
                 reason="token_age_exceeded",
                 rule_id=rule.rule_id,
+                required_roles=rule.rehydrate_roles or [],
+                purpose=rule.rehydrate_purpose,
+                app_id=rule.rehydrate_app_id,
+                environment=rule.rehydrate_environment,
+                max_token_age_seconds=rule.max_token_age_seconds,
+                matched_constraints=constraints,
             )
     if rule.rehydrate_roles is not None and not set(context.roles).intersection(
         rule.rehydrate_roles
@@ -202,11 +261,23 @@ def decide_rehydration(
             allowed=False,
             reason="role_not_allowed",
             rule_id=rule.rule_id,
+            required_roles=rule.rehydrate_roles,
+            purpose=rule.rehydrate_purpose,
+            app_id=rule.rehydrate_app_id,
+            environment=rule.rehydrate_environment,
+            max_token_age_seconds=rule.max_token_age_seconds,
+            matched_constraints=constraints,
         )
     return RehydrationPolicyDecision(
         allowed=True,
         reason="rehydration_rule_matched",
         rule_id=rule.rule_id,
+        required_roles=rule.rehydrate_roles or [],
+        purpose=rule.rehydrate_purpose,
+        app_id=rule.rehydrate_app_id,
+        environment=rule.rehydrate_environment,
+        max_token_age_seconds=rule.max_token_age_seconds,
+        matched_constraints=constraints,
     )
 
 

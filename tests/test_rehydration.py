@@ -95,6 +95,12 @@ def test_p16_rehydration_policy_allows_authorized_role() -> None:
 
     assert response.text == "a@example.com"
     assert response.diagnostics[0].status == "allowed"
+    assert response.diagnostics[0].policy_id == "rehydrate"
+    assert response.diagnostics[0].policy_version == "1"
+    assert response.diagnostics[0].rule_id == "admin_email"
+    assert response.diagnostics[0].requester_roles == ["admin"]
+    assert response.diagnostics[0].required_roles == ["admin"]
+    assert response.diagnostics[0].matched_constraints == {"roles": "admin"}
     assert response.audit_event.metadata["allowed_count"] == "1"
 
 
@@ -130,6 +136,12 @@ def test_p16_rehydration_policy_blocks_unauthorized_role() -> None:
     assert response.text == "EMAIL_1"
     assert response.diagnostics[0].status == "policy_blocked"
     assert response.diagnostics[0].reason == "role_not_allowed"
+    assert response.diagnostics[0].policy_id == "rehydrate"
+    assert response.diagnostics[0].policy_version == "1"
+    assert response.diagnostics[0].rule_id == "admin_email"
+    assert response.diagnostics[0].requester_roles == ["viewer"]
+    assert response.diagnostics[0].required_roles == ["admin"]
+    assert response.diagnostics[0].matched_constraints == {"roles": "admin"}
 
 
 def test_p16_rehydration_reports_wrong_scope_and_expired_tokens() -> None:

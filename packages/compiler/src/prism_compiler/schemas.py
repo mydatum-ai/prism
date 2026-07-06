@@ -50,9 +50,21 @@ class TransformationDecision(BaseModel):
     action: str
     policy_id: str
     policy_version: str
+    policy_source: Literal["enterprise", "cache", "fallback", "local", "package", "unknown"] = (
+        "unknown"
+    )
+    policy_cache_hit: bool | None = None
+    policy_cache_stale: bool | None = None
     rule_id: str | None = None
     reason: str
     token: str | None = None
+    token_strategy: str | None = None
+    app_id: str | None = None
+    role: str | None = None
+    purpose: str | None = None
+    direction: str | None = None
+    environment: str | None = None
+    matched_constraints: dict[str, str] = Field(default_factory=dict)
     start: int = Field(ge=0)
     end: int = Field(ge=0)
     confidence: float = Field(ge=0.0, le=1.0, default=1.0)
@@ -79,6 +91,12 @@ class TransformRequest(BaseModel):
     purpose: str | None = None
     direction: str | None = None
     environment: str | None = None
+    policy_source: (
+        Literal["enterprise", "cache", "fallback", "local", "package", "unknown"] | None
+    ) = None
+    policy_cache_hit: bool | None = None
+    policy_cache_stale: bool | None = None
+    policy_provider_latency_ms: float | None = None
 
 
 class TransformResponse(BaseModel):
@@ -100,6 +118,12 @@ class RehydrateRequest(BaseModel):
     direction: str | None = None
     environment: str | None = None
     allowed_entity_types: list[str] | None = None
+    policy_source: (
+        Literal["enterprise", "cache", "fallback", "local", "package", "unknown"] | None
+    ) = None
+    policy_cache_hit: bool | None = None
+    policy_cache_stale: bool | None = None
+    policy_provider_latency_ms: float | None = None
 
 
 class RehydrationDiagnostic(BaseModel):
@@ -114,6 +138,20 @@ class RehydrationDiagnostic(BaseModel):
         "policy_blocked",
     ]
     reason: str
+    policy_id: str | None = None
+    policy_version: str | None = None
+    policy_source: Literal["enterprise", "cache", "fallback", "local", "package", "unknown"] = (
+        "unknown"
+    )
+    rule_id: str | None = None
+    requester_roles: list[str] = Field(default_factory=list)
+    required_roles: list[str] = Field(default_factory=list)
+    purpose: str | None = None
+    direction: str | None = None
+    environment: str | None = None
+    token_age_seconds: float | None = None
+    max_token_age_seconds: int | None = None
+    matched_constraints: dict[str, str] = Field(default_factory=dict)
 
 
 class RehydrateResponse(BaseModel):

@@ -109,6 +109,7 @@ def transform(
                 "request_id": request_id,
                 "policy_id": decision.policy_id,
                 "policy_version": decision.policy_version,
+                "policy_source": request.policy_source or "unknown",
                 "entity_type": detection.entity_type,
                 "decision_reason": decision.reason,
                 "token_strategy": decision.token_strategy,
@@ -132,9 +133,19 @@ def transform(
                 action=decision.action,
                 policy_id=decision.policy_id,
                 policy_version=decision.policy_version,
+                policy_source=request.policy_source or "unknown",
+                policy_cache_hit=request.policy_cache_hit,
+                policy_cache_stale=request.policy_cache_stale,
                 rule_id=decision.rule_id,
                 reason=decision.reason,
                 token=replacement if decision.action == "tokenize" else None,
+                token_strategy=decision.token_strategy,
+                app_id=request.app_id,
+                role=decision.role,
+                purpose=request.purpose or decision.purpose,
+                direction=request.direction or decision.direction,
+                environment=request.environment or decision.environment,
+                matched_constraints=decision.matched_constraints,
                 start=token_start,
                 end=transformed_cursor,
                 confidence=detection.confidence,
@@ -159,6 +170,18 @@ def transform(
         request_id=request_id,
         policy_id=request.policy_id or policy.policy_id,
         policy_version=policy.version,
+        metadata={
+            "policy_source": request.policy_source or "unknown",
+            "policy_cache_hit": str(request.policy_cache_hit).lower()
+            if request.policy_cache_hit is not None
+            else "unknown",
+            "policy_cache_stale": str(request.policy_cache_stale).lower()
+            if request.policy_cache_stale is not None
+            else "unknown",
+            "policy_provider_latency_ms": f"{request.policy_provider_latency_ms:.3f}"
+            if request.policy_provider_latency_ms is not None
+            else "unknown",
+        },
     )
     response = TransformResponse(
         request_id=request_id,
@@ -221,9 +244,17 @@ def _transaction_event_for_transform(
                 action=decision.action,
                 policy_id=decision.policy_id,
                 policy_version=decision.policy_version,
+                policy_source=decision.policy_source,
                 rule_id=decision.rule_id,
                 reason=decision.reason,
                 token=decision.token,
+                token_strategy=decision.token_strategy,
+                app_id=decision.app_id,
+                role=decision.role,
+                purpose=decision.purpose,
+                direction=decision.direction,
+                environment=decision.environment,
+                matched_constraints=decision.matched_constraints,
                 confidence=decision.confidence,
             )
             for decision in response.decisions

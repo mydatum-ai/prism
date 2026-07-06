@@ -1,5 +1,5 @@
 from prism_compiler.schemas import TransformRequest
-from prism_policy_runtime import Policy
+from prism_policy_runtime import Policy, PolicyRule
 from prism_transformers import transform
 from prism_vault_core import InMemoryVault
 
@@ -38,6 +38,9 @@ def test_p16_decisions_include_policy_rule_and_reason_metadata() -> None:
     assert response.decisions[0].policy_version == "4"
     assert response.decisions[0].rule_id == "rule_person_tokenize"
     assert response.decisions[0].reason == "rule_matched"
+    assert response.decisions[0].token_strategy == "sequence"
+    assert response.decisions[0].purpose is None
+    assert response.decisions[0].matched_constraints == {}
     assert response.mappings[0].metadata["rule_id"] == "rule_person_tokenize"
 
 
@@ -268,3 +271,56 @@ def test_p16_mapping_metadata_contains_scope_policy_and_decision_fields() -> Non
     assert metadata["rule_id"] == "email_token"
     assert metadata["decision_reason"] == "rule_matched"
     assert metadata["token_strategy"] == "sequence"
+
+
+def test_decision_explanation_includes_runtime_and_context_metadata() -> None:
+    policy = Policy(
+        domain="commercial",
+        version="4",
+        rules=[
+            PolicyRule(
+                rule_id="email_outbound",
+                entity_type="email",
+                action="tokenize",
+                purpose="support",
+                direction="outbound",
+                app_id="pulse",
+                environment="prod",
+                min_confidence=0.5,
+                token_strategy="session_stable",
+                token_prefix="EMAIL",
+            )
+        ],
+    )
+
+    response = transform(
+        TransformRequest(
+            tenant_id="tenant_a",
+            app_id="pulse",
+            session_id="session_1",
+            text="Email maria@example.com",
+            purpose="support",
+            direction="outbound",
+            environment="prod",
+            policy_source="enterprise",
+            policy_cache_hit=False,
+            policy_cache_stale=False,
+        ),
+        policy=policy,
+    )
+
+    decision = response.decisions[0]
+    assert decision.policy_source == "enterprise"
+    assert decision.policy_cache_hit is False
+    assert decision.policy_cache_stale is False
+    assert decision.token_strategy == "session_stable"
+    assert decision.purpose == "support"
+    assert decision.direction == "outbound"
+    assert decision.environment == "prod"
+    assert decision.matched_constraints == {
+        "purpose": "support",
+        "direction": "outbound",
+        "app_id": "pulse",
+        "environment": "prod",
+        "min_confidence": "0.5",
+    }
