@@ -12,6 +12,8 @@ from prism_compiler.schemas import (
     PolicyCacheInvalidateResponse,
     RehydrateRequest,
     RehydrateResponse,
+    ResponsesRequest,
+    ResponsesResponse,
     RuntimePolicyStatusResponse,
     TransformRequest,
     TransformResponse,
@@ -33,6 +35,7 @@ from prism_gateway.routes import (
     chat_completions_endpoint,
     chat_mock_endpoint,
     rehydrate_endpoint,
+    responses_endpoint,
     runtime_policy_status,
     transform_endpoint,
 )
@@ -124,6 +127,19 @@ def chat_completions_route(
     tenant_id = request.metadata.get("tenant_id", "default")
     require_tenant(principal, tenant_id)
     response = chat_completions_endpoint(request)
+    if response.audit_event is not None:
+        active_audit_store().record(response.audit_event)
+    return response
+
+
+@app.post("/v1/responses", response_model=ResponsesResponse)
+def responses_route(
+    request: ResponsesRequest,
+    principal: Annotated[Principal, Depends(authenticate)],
+) -> ResponsesResponse:
+    tenant_id = request.metadata.get("tenant_id", "default")
+    require_tenant(principal, tenant_id)
+    response = responses_endpoint(request)
     if response.audit_event is not None:
         active_audit_store().record(response.audit_event)
     return response

@@ -203,3 +203,39 @@ class OpenAIChatCompletionResponse(BaseModel):
     model: str
     choices: list[OpenAIChatChoice]
     audit_event: AuditEvent | None = None
+
+
+class ResponsesInputMessage(BaseModel):
+    role: Literal["system", "user", "assistant"]
+    content: str
+
+
+class ResponsesRequest(BaseModel):
+    model: str
+    input: str | list[ResponsesInputMessage]
+    instructions: str | None = None
+    metadata: dict[str, str] = Field(default_factory=dict)
+    temperature: float | None = None
+
+
+class ResponsesOutputContent(BaseModel):
+    type: Literal["output_text"] = "output_text"
+    text: str
+
+
+class ResponsesOutputMessage(BaseModel):
+    id: str
+    type: Literal["message"] = "message"
+    role: Literal["assistant"] = "assistant"
+    content: list[ResponsesOutputContent]
+
+
+class ResponsesResponse(BaseModel):
+    id: str
+    object: Literal["response"] = "response"
+    created_at: int
+    model: str
+    output: list[ResponsesOutputMessage]
+    output_text: str
+    metadata: dict[str, str] = Field(default_factory=dict)
+    audit_event: AuditEvent | None = None

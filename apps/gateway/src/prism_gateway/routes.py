@@ -15,6 +15,10 @@ from prism_compiler.schemas import (
     OpenAIChatCompletionResponse,
     RehydrateRequest,
     RehydrateResponse,
+    ResponsesOutputContent,
+    ResponsesOutputMessage,
+    ResponsesRequest,
+    ResponsesResponse,
     RuntimePolicyStatusResponse,
     TransformRequest,
     TransformResponse,
@@ -233,3 +237,85 @@ def chat_completions_endpoint(
             metadata=policy_audit_metadata(resolution),
         ),
     )
+
+
+def responses_endpoint(
+    request: ResponsesRequest,
+    provider: Provider | None = None,
+) -> ResponsesResponse:
+    tenant_id = request.metadata.get("tenant_id", "default")
+    app_id = request.metadata.get("app_id", "default")
+    session_id = request.metadata.get("session_id", str(uuid4()))
+    resolution = active_policy_resolution(tenant_id, app_id)
+    transformed_messages = [
+        ChatMessage(
+            role=message.role,
+            content=transform(
+                TransformRequest(
+                    tenant_id=tenant_id,
+                    app_id=app_id,
+                    session_id=session_id,
+                    text=message.content,
+                    policy_source=resolution.source,
+                    policy_cache_hit=resolution.cache_hit,
+                    policy_cache_stale=resolution.cache_stale,
+                    policy_provider_latency_ms=resolution.provider_latency_ms,
+                ),
+                policy=resolution.policy,
+            ).transformed_text,
+        )
+        for message in _responses_messages(request)
+    ]
+    provider_response = (provider or active_provider()).complete(
+        request.model, transformed_messages
+    )
+    rehydrated = rehydrate(
+        RehydrateRequest(
+            tenant_id=tenant_id,
+            app_id=app_id,
+            session_id=session_id,
+            text=provider_response.content,
+            policy_source=resolution.source,
+            policy_cache_hit=resolution.cache_hit,
+            policy_cache_stale=resolution.cache_stale,
+            policy_provider_latency_ms=resolution.provider_latency_ms,
+        ),
+        policy=resolution.policy,
+    )
+    output_text = rehydrated.text
+    return ResponsesResponse(
+        id=f"resp_{uuid4().hex}",
+        created_at=int(time.time()),
+        model=provider_response.model,
+        output=[
+            ResponsesOutputMessage(
+                id=f"msg_{uuid4().hex}",
+                content=[ResponsesOutputContent(text=output_text)],
+            )
+        ],
+        output_text=output_text,
+        metadata=request.metadata,
+        audit_event=AuditEvent(
+            event_type="responses",
+            tenant_id=tenant_id,
+            app_id=app_id,
+            session_id=session_id,
+            request_id=rehydrated.request_id,
+            policy_id=resolution.policy.policy_id,
+            policy_version=resolution.policy.version,
+            metadata=policy_audit_metadata(resolution),
+        ),
+    )
+
+
+def _responses_messages(request: ResponsesRequest) -> list[ChatMessage]:
+    messages: list[ChatMessage] = []
+    if request.instructions:
+        messages.append(ChatMessage(role="system", content=request.instructions))
+    if isinstance(request.input, str):
+        messages.append(ChatMessage(role="user", content=request.input))
+    else:
+        messages.extend(
+            ChatMessage(role=message.role, content=message.content) for message in request.input
+        )
+    return messages or [ChatMessage(role="user", content="")]
